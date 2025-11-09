@@ -1,55 +1,58 @@
-import  {v2 as cloudinary} from "cloudinary"
+import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
 
-import fs from "fs"   //files system 
-
-
-const uploadToCloudinary =   async (localFilePath)   => {
+// Configure cloudinary once (outside the function)
 cloudinary.config({ 
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME ,
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY, 
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-        api_key:  process.env.CLOUDINARY_API_KEY, 
-
-        api_secret: process.env.CLOUDINARY_API_SECRET
-    });
-
-
+const uploadToCloudinary = async (localFilePath) => {
     try { 
-
-        if(!localFilePath) return null
-
-        //upload file to cloudinary
-     const response = await cloudinary.uploader.upload(localFilePath, { resource_type: "auto"} )
-
-
-
-         fs.unlinkSync(localFilePath) ;
-
-      
-
+        if (!localFilePath) return null;
+        
+        // Check if file exists before uploading
+        if (!fs.existsSync(localFilePath)) {
+            console.log("File does not exist:", localFilePath);
+            return null;
+        }
+        
+        // Upload file to cloudinary
+        const response = await cloudinary.uploader.upload(localFilePath, { 
+            resource_type: "auto"
+        });
+        
+        // Delete local file after successful upload
+        fs.unlinkSync(localFilePath);
+        console.log("File uploaded and local copy deleted:", localFilePath);
+        
         return response;
-
+    } catch (error) {
+        console.log("Error uploading to cloudinary:", error);
+        
+        // Remove the locally saved temp file as the upload operation failed
+        if (fs.existsSync(localFilePath)) {
+            fs.unlinkSync(localFilePath);
+            console.log("Local file deleted after upload failure:", localFilePath);
+        }
+        
+        return null; // Return null instead of throwing error
     }
-    catch(Error)  {
+};
 
-        fs.unlinkSync(localFilePath)  //remove the locally saved temp file as the upload operation got failed
-
-
-
-
-    }
-}
-
-
-const deleteFromCloudinary =  async(publicId) => { 
-
+const deleteFromCloudinary = async (publicId) => { 
     try { 
-        if(!publicId) return null
-
-        const result = await cloudinary.uploader.destroy(publicId)
-
-        return result 
-    }catch(error) { 
-        console.log("Error deleting from cloudinary", error) ; 
+        if (!publicId) return null;
+        
+        const result = await cloudinary.uploader.destroy(publicId);
+        console.log("File deleted from cloudinary:", publicId);
+        
+        return result;
+    } catch (error) { 
+        console.log("Error deleting from cloudinary:", error);
+        return null;
     }
-}
-export { uploadToCloudinary, deleteFromCloudinary};
+};
+
+export { uploadToCloudinary, deleteFromCloudinary };

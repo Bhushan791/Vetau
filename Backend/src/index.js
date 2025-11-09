@@ -24,3 +24,11 @@ connectDB()
 
 }) 
 
+
+app.get("/", (req, res)=>{
+
+    res.send(
+        
+       "<h1>everything is working GOOD TO GO !</h1>") 
+})
+
