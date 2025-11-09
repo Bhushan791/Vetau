@@ -40,9 +40,7 @@ cloudinary.config({
 }
 
 
-
 const deleteFromCloudinary =  async(publicId) => { 
-
 
     try { 
         if(!publicId) return null
