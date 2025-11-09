@@ -5,6 +5,7 @@ import {
   logoutUser,
   refreshAccessToken,
   googleAuthCallback,
+  googleAuth,
   getCurrentUser,
   updateAccountDetails,
   updateUserProfileImage,
@@ -47,12 +48,23 @@ router.route("/login").post(loginUser);
  */
 router.route("/refresh-token").post(refreshAccessToken);
 
+// ============================================
+// GOOGLE OAUTH ROUTES
+// ============================================
+
 /**
- * @route   GET /api/v1/users/google/callback
- * @desc    Google OAuth callback (placeholder)
+ * @route   GET /api/v1/users/google
+ * @desc    Initiate Google OAuth (redirects to Google login)
  * @access  Public
  */
-router.route("/google/callback").get(googleAuthCallback);
+router.route("/google").get(googleAuth);
+
+/**
+ * @route   GET /api/v1/users/google/callback
+ * @desc    Google OAuth callback (receives auth code from Google)
+ * @access  Public
+ */
+router.route("/google/callback").get(...googleAuthCallback);
 
 // ============================================
 // PASSWORD RESET ROUTES (Public - OTP based)

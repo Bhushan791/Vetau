@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
-
+import passport from "../config/passport.js";
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -219,9 +219,32 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-const googleAuthCallback = asyncHandler(async (req, res) => {
-  throw new ApiError(501, "Google authentication not implemented yet");
+
+
+const googleAuth = passport.authenticate("google", {
+  scope: ["profile", "email"],
 });
+
+// Google OAuth Callback
+const googleAuthCallback = [
+  passport.authenticate("google", { 
+    session: false, 
+    failureRedirect: "http://localhost:3000/login?error=auth_failed" 
+  }),
+  asyncHandler(async (req, res) => {
+    // Generate tokens for the authenticated user
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(req.user._id);
+
+    // Get user data
+    const user = await User.findById(req.user._id).select("-password -refreshToken");
+
+    // Redirect to frontend with tokens (change URL based on your frontend)
+    const redirectUrl = `http://localhost:3000/auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`;
+    
+    res.redirect(redirectUrl);
+  }),
+];
+
 
 // ============================================
 // PROFILE MANAGEMENT
@@ -454,6 +477,7 @@ export {
   logoutUser,
   refreshAccessToken,
   googleAuthCallback,
+  googleAuth,
   getCurrentUser,
   updateAccountDetails,
   updateUserProfileImage,
