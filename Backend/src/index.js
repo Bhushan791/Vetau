@@ -10,7 +10,7 @@ connectDB()
 .then(()=>{ 
     app.listen(port, ()=>{
 
-        console.log('Server is running at PORT:',port) ;
+        console.log('Server is running at this PORT:',port) ;
     })
 
     app.on("error", (error)=> { 
