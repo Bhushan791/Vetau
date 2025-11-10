@@ -21,7 +21,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 const router = Router();
 
 // ============================================
-// PUBLIC ROUTES (No authentication required)
+// PUBLIC ROUTES (No authentication required) ---> TESTING PASSED
 // ============================================
 
 /**
@@ -49,7 +49,7 @@ router.route("/login").post(loginUser);
 router.route("/refresh-token").post(refreshAccessToken);
 
 // ============================================
-// GOOGLE OAUTH ROUTES
+// GOOGLE OAUTH ROUTES -->TESTTING PASSED
 // ============================================
 
 /**
@@ -66,8 +66,12 @@ router.route("/google").get(googleAuth);
  */
 router.route("/google/callback").get(...googleAuthCallback);
 
+
+
+
+
 // ============================================
-// PASSWORD RESET ROUTES (Public - OTP based)
+// PASSWORD RESET ROUTES (Public - OTP based)       ----------  TESTING PASSED
 // ============================================
 
 /**

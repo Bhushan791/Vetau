@@ -58,7 +58,6 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
   };
   await transporter.sendMail(mailOptions);
 };
-
 // ============================================
 // AUTHENTICATION CONTROLLERS
 // ============================================
@@ -389,14 +388,15 @@ const forgotPassword = asyncHandler(async (req, res) => {
   user.passwordResetOTPExpiry = Date.now() + 10 * 60 * 1000;
   await user.save({ validateBeforeSave: false });
 
-  try {
-    await sendOTPEmail(email, otp, "password reset");
-  } catch (error) {
-    user.passwordResetOTP = undefined;
-    user.passwordResetOTPExpiry = undefined;
-    await user.save({ validateBeforeSave: false });
-    throw new ApiError(500, "Failed to send OTP email. Please try again.");
-  }
+ try {
+  await sendOTPEmail(email, otp, "password reset");
+} catch (error) {
+  console.error("EMAIL ERROR DETAILS:", error); // Add this
+  user.passwordResetOTP = undefined;
+  user.passwordResetOTPExpiry = undefined;
+  await user.save({ validateBeforeSave: false });
+  throw new ApiError(500, "Failed to send OTP email. Please try again.");
+}
 
   return res
     .status(200)
