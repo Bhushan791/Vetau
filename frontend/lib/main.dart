@@ -1,28 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/components/homeAppBar.dart';
-import 'package:frontend/pages/app.dart';
+
+// pages
 import 'package:frontend/pages/home.dart';
+import 'package:frontend/pages/search.dart';
+import 'package:frontend/pages/chats.dart';
+import 'package:frontend/pages/more.dart';
+import 'package:frontend/pages/post.dart';
+
 void main() {
   runApp(const ProviderScope(child: MyApp()));
 }
-
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Riverpod Counter Demo',
-//       theme: ThemeData(
-//         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-//         useMaterial3: true,
-//       ),
-//       debugShowCheckedModeBanner: false,
-//       home: const HomePage(),
-//     );
-//   }
-// }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -31,32 +19,18 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.blue,
-        appBar: PreferredSize(preferredSize: const Size.fromHeight(200), child: HomeAppBar(
-          rewardPoints: 120.76,
-          onNotificationTap: () {
-            print("Notification tapped");
-          },
-          onProfileTap: () {
-            print("Profile tapped");
-          },
-        ),
-        ),
-        body: Center(
-          child: Container(
-            height: 300,
-            width: 300,
-            decoration: BoxDecoration(
-              color: Colors.deepPurple,
-              borderRadius: BorderRadius.circular(20)
-            ),
-            padding: EdgeInsets.all(25),
-            child: Icon(Icons.favorite_outline, color: Colors.white, size: 100),
-            ),
-        ),
-      )
+
+      // ✅ Starting page
+      initialRoute: '/home',
+
+      // ✅ Route definitions
+      routes: {
+        '/home': (context) => const HomePage(),
+        '/search': (context) => const SearchPage(),
+        '/chats': (context) => const ChatsPage(),
+        '/more': (context) => const MorePage(),
+        '/post': (context) => const PostPage(),
+      },
     );
   }
 }
-
