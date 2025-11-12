@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/pages/detail_home.dart';
 
 // pages
 import 'package:frontend/pages/home.dart';
@@ -30,6 +31,7 @@ class MyApp extends StatelessWidget {
         '/chats': (context) => const ChatsPage(),
         '/more': (context) => const MorePage(),
         '/post': (context) => const PostPage(),
+        '/detailHome': (context) => const DetailHome(),
       },
     );
   }

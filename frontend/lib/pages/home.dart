@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/components/homeAppBar.dart';
 import 'package:frontend/components/bottomNav.dart';
+import 'package:frontend/components/filter_component.dart';
+import 'package:frontend/stores/filter_store.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -65,16 +68,63 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  final post = posts[index];
-                  return PostCard(post: post);
-                },
+        body: Consumer(
+          builder: (context, ref, child) {
+            final selected = ref.watch(filterStoreProvider);
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🧩 Filter Component
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: FilterComponent(),
+                  ),
+
+                  // 🧠 Display selected filters
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      selected.isEmpty
+                          ? "No filters selected"
+                          : "You selected: ${selected.join(', ')}",
+                      style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 📝 Posts List
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: posts.length,
+                            itemBuilder: (context, index) {
+                              final post = posts[index];
+                              return GestureDetector(
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                        context, '/detailHome',
+                                        arguments: post);
+                                  },
+                                child: PostCard(post: post));
+                            },
+                          ),
+                  ),
+                ],
               ),
+            );
+          },
+        ),
         bottomNavigationBar: const BottomNav(currentIndex: 0),
       ),
     );

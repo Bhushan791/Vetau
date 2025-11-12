@@ -1,28 +1,34 @@
 import 'package:flutter_riverpod/legacy.dart';
 
-/// This provider exposes the list of selected filters.
-/// It uses a StateNotifier to manage adding/removing filters.
 final filterStoreProvider =
     StateNotifierProvider<FilterStore, List<String>>((ref) {
   return FilterStore();
 });
 
-/// FilterStore manages the selected filters list.
-/// It has a toggle method that selects or unselects a filter.
 class FilterStore extends StateNotifier<List<String>> {
-  FilterStore() : super([]);
+  FilterStore() : super(['All']); // Default: All selected
 
-  /// Toggles a filter on/off
   void toggleFilter(String filter) {
-    if (state.contains(filter)) {
-      state = [...state]..remove(filter);
-    } else {
-      state = [...state, filter];
+    if (filter == 'All') {
+      // Selecting All clears others
+      state = ['All'];
+      return;
     }
+
+    // Remove "All" when another filter is selected
+    final current = [...state]..remove('All');
+
+    if (current.contains(filter)) {
+      current.remove(filter);
+    } else {
+      current.add(filter);
+    }
+
+    // If nothing selected, revert back to All
+    if (current.isEmpty) current.add('All');
+
+    state = current;
   }
 
-  /// Optionally: clear all filters
-  void clearFilters() {
-    state = [];
-  }
+  void clearFilters() => state = ['All'];
 }

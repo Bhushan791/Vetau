@@ -134,7 +134,7 @@ class BottomNav extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isActive ? Colors.blue : Colors.blue,
+              color: isActive ? const Color(0xFF2196F3) : Colors.blue,
               shape: BoxShape.circle,
             ),
             child: Icon(
