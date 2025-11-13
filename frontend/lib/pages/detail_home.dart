@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/stores/like_store.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-class DetailHome extends StatefulWidget {
+class DetailHome extends ConsumerStatefulWidget {
   const DetailHome({super.key});
 
   @override
-  State<DetailHome> createState() => _DetailHomeState();
+  ConsumerState<DetailHome> createState() => _DetailHomeState();
 }
 
-class _DetailHomeState extends State<DetailHome> {
+class _DetailHomeState extends ConsumerState<DetailHome> {
   Map<String, dynamic>? postData;
   Map<String, dynamic>? commentData;
   bool isLoading = true;
@@ -29,16 +31,13 @@ class _DetailHomeState extends State<DetailHome> {
 
     try {
       final postResponse = await http.get(
-        Uri.parse('https://dummyjson.com/c/5fbb-eeeb-499a-bdcb'),        
+        Uri.parse('https://dummyjson.com/c/5fbb-eeeb-499a-bdcb'),
       );
       final commentResponse = await http.get(
         Uri.parse('https://dummyjson.com/c/2e0b-a391-4bae-971a'),
       );
 
       if (postResponse.statusCode == 200 && commentResponse.statusCode == 200) {
-        print('Post Response: ${postResponse.body}');
-        print('Comment Response: ${commentResponse.body}');
-        
         setState(() {
           postData = json.decode(postResponse.body);
           commentData = json.decode(commentResponse.body);
@@ -57,6 +56,8 @@ class _DetailHomeState extends State<DetailHome> {
 
   @override
   Widget build(BuildContext context) {
+    final likeState = ref.watch(likesProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Post Details')),
       body: isLoading
@@ -80,7 +81,7 @@ class _DetailHomeState extends State<DetailHome> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      /// --- POST DETAILS ---
+                      // -------- POST SECTION --------
                       if (postData != null) ...[
                         Row(
                           children: [
@@ -109,7 +110,7 @@ class _DetailHomeState extends State<DetailHome> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 18, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFFFD8B02),
+                                  color: const Color(0xFFFD8B02),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
@@ -126,12 +127,13 @@ class _DetailHomeState extends State<DetailHome> {
                         Row(
                           children: [
                             Chip(
-                              label: Text(postData!['status'], style: TextStyle(color: Colors.white),), 
-                              backgroundColor: Color.fromARGB(255, 225, 61, 61),
-
+                              label: const Text("LOST",
+                                  style: TextStyle(color: Colors.white)),
+                              backgroundColor:
+                                  const Color.fromARGB(255, 225, 61, 61),
                             ),
                             const SizedBox(width: 8),
-                            Chip(label: Text(postData!['location'])),
+                            Chip(label: Text(postData!['location'] ?? '')),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -149,30 +151,65 @@ class _DetailHomeState extends State<DetailHome> {
                             borderRadius: BorderRadius.circular(8),
                             child: Image.network(postData!['images'][0]),
                           ),
+
                         const SizedBox(height: 16),
+
+                        // -------- POST ACTION BUTTONS (comment, share, save) --------
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            Text("❤️ ${postData!['stats']['likes']}"),
-                            Text("💬 ${postData!['stats']['comments']}"),
-                            Text("🔗 ${postData!['stats']['shares']}"),
+                            IconButton(
+                              icon: const Icon(Icons.mode_comment_outlined),
+                              onPressed: () {},
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined),
+                              onPressed: () {},
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.bookmark_border),
+                              onPressed: () {},
+                            ),
                           ],
                         ),
+
                         const SizedBox(height: 20),
                         ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.pets),
-                          label: const Text('Claim as found'),
+                          onPressed: () {
+                            // Your action here
+                          },
+                          icon: const Icon(
+                            Icons.chat_outlined,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          label: const Text(
+                            'Claim as found',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 50),
                             backgroundColor: Colors.blue,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                           ),
                         ),
+
                         const SizedBox(height: 24),
                         const Divider(),
                       ],
 
-                      /// --- COMMENTS SECTION ---
+                      // -------- COMMENTS SECTION --------
                       if (commentData != null) ...[
                         Text(
                           "Comments (${commentData!['comments'].length})",
@@ -180,7 +217,9 @@ class _DetailHomeState extends State<DetailHome> {
                               fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 12),
-                        for (var c in commentData!['comments']) ...[
+                        for (int index = 0;
+                            index < commentData!['comments'].length;
+                            index++) ...[
                           Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(12),
@@ -195,7 +234,9 @@ class _DetailHomeState extends State<DetailHome> {
                                   children: [
                                     CircleAvatar(
                                       backgroundImage: NetworkImage(
-                                          c['author']['avatar'] ?? ''),
+                                          commentData!['comments'][index]
+                                                  ['author']['avatar'] ??
+                                              ''),
                                     ),
                                     const SizedBox(width: 10),
                                     Column(
@@ -203,28 +244,70 @@ class _DetailHomeState extends State<DetailHome> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          c['author']['name'],
+                                          commentData!['comments'][index]
+                                              ['author']['name'],
                                           style: const TextStyle(
                                               fontWeight: FontWeight.bold),
                                         ),
-                                        Text(c['postedAgo']),
+                                        Text(
+                                          commentData!['comments'][index]
+                                              ['postedAgo'],
+                                        ),
                                       ],
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text(c['text']),
+                                Text(
+                                  commentData!['comments'][index]['text'],
+                                ),
                                 const SizedBox(height: 8),
+
+                                // -------- LIKE & REPLY for comments --------
                                 Row(
                                   children: [
-                                    Text("❤️ ${c['likes']}"),
+                                    IconButton(
+                                      icon: Icon(
+                                        likeState.likedComments
+                                                .contains(index.toString())
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 20,
+                                        color: likeState.likedComments
+                                                .contains(index.toString())
+                                            ? Colors.red
+                                            : Colors.grey,
+                                      ),
+                                      onPressed: () {
+                                        ref
+                                            .read(likesProvider.notifier)
+                                            .toggleLike(
+                                              index.toString(),
+                                              commentData!['comments'][index]
+                                                  ['likes'],
+                                            );
+                                      },
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "${likeState.likeCounts[index.toString()] ?? commentData!['comments'][index]['likes']}",
+                                    ),
                                     const SizedBox(width: 16),
-                                    const Text("Reply",
-                                        style: TextStyle(color: Colors.blue)),
+                                    TextButton(
+                                      onPressed: () {},
+                                      child: const Text(
+                                        "Reply",
+                                        style: TextStyle(color: Colors.blue),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                if (c['replies'] != null &&
-                                    c['replies'].isNotEmpty)
+
+                                // -------- REPLIES --------
+                                if (commentData!['comments'][index]['replies'] !=
+                                        null &&
+                                    commentData!['comments'][index]['replies']
+                                        .isNotEmpty)
                                   Container(
                                     margin: const EdgeInsets.only(
                                         left: 40, top: 8),
@@ -237,7 +320,8 @@ class _DetailHomeState extends State<DetailHome> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        for (var r in c['replies']) ...[
+                                        for (var r in commentData!['comments']
+                                            [index]['replies']) ...[
                                           Row(
                                             children: [
                                               CircleAvatar(

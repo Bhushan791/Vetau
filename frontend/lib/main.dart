@@ -4,6 +4,8 @@ import 'package:frontend/pages/detail_home.dart';
 
 // pages
 import 'package:frontend/pages/home.dart';
+import 'package:frontend/pages/login.dart';
+import 'package:frontend/pages/register.dart';
 import 'package:frontend/pages/search.dart';
 import 'package:frontend/pages/chats.dart';
 import 'package:frontend/pages/more.dart';
@@ -22,10 +24,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // ✅ Starting page
-      initialRoute: '/home',
+      initialRoute: '/',
 
       // ✅ Route definitions
       routes: {
+        '/login': (context) => const LoginPage(),
+        '/': (context) => const RegisterPage(),
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/chats': (context) => const ChatsPage(),
