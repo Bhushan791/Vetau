@@ -42,3 +42,7 @@ build/
 
 # MongoDB local database files (if accidentally included)
 data/
+
+
+public/temp/
+../main.html
