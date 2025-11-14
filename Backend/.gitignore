@@ -24,7 +24,7 @@ Thumbs.db
 # Coverage folder
 coverage/
 
-# Build folders
+# Build folder (if you have one)
 dist/
 build/
 
@@ -43,9 +43,6 @@ build/
 # MongoDB local database files (if accidentally included)
 data/
 
-# Temp uploads folder
-public/temp/*
-!public/temp/.gitkeep
 
-# Other static files to ignore
+public/temp/
 ../main.html
