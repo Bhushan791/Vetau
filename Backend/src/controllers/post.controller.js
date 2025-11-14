@@ -4,7 +4,9 @@ import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 
 // ============================================
 // POST CONTROLLERS
@@ -16,52 +18,117 @@ import { v4 as uuidv4 } from "uuid";
  * @access  Private
  */
 const createPost = asyncHandler(async (req, res) => {
-  const { type, itemName, description, location, rewardAmount, isAnonymous, category, tags } = req.body;
-  const images = req.files ? req.files.map(file => file.filename) : [];
+  // Debug log
+console.log("📦 Request body:", req.body);
+console.log("📁 Files:", req.files);
+  try {
+    const {
+      type,
+      itemName,
+      description,
+      location,
+      rewardAmount,
+      isAnonymous,
+      category,
+      tags,
+    } = req.body;
 
-  if (!type || !itemName || !description || !category) {
-    throw new ApiError(400, "Type, item name, description, and category are required");
-  }
-
-  if (!["lost", "found"].includes(type)) {
-    throw new ApiError(400, "Type must be either 'lost' or 'found'");
-  }
-
-  if (type === "lost" && !rewardAmount) {
-    throw new ApiError(400, "Reward amount is required for lost posts");
-  }
-
-  if (type === "found" && (!location || images.length === 0)) {
-    throw new ApiError(400, "Location and at least one image are required for found posts");
-  }
-
-  if (isAnonymous) {
-    const user = await User.findById(req.user._id);
-    if (!user.username) {
-      throw new ApiError(400, "Please set a username in your profile to post anonymously");
+    // Validation
+    if (!type || !itemName || !description || !category) {
+      throw new ApiError(
+        400,
+        "Type, item name, description, and category are required"
+      );
     }
+
+    if (!["lost", "found"].includes(type)) {
+      throw new ApiError(400, "Type must be either 'lost' or 'found'");
+    }
+
+    // Type-specific validation
+    if (type === "lost" && !rewardAmount) {
+      throw new ApiError(400, "Reward amount is required for lost posts");
+    }
+
+    if (type === "found" && !location) {
+      throw new ApiError(400, "Location is required for found posts");
+    }
+
+    if (type === "found" && (!req.files || req.files.length === 0)) {
+      throw new ApiError(
+        400,
+        "At least one image is required for found posts"
+      );
+    }
+
+    // Check if category exists
+    const categoryExists = await Category.findOne({
+      name: category.toLowerCase(),
+    });
+    if (!categoryExists) {
+      throw new ApiError(404, "Category not found");
+    }
+
+    // If anonymous, check if user has username set
+    if (isAnonymous) {
+      const user = await User.findById(req.user._id);
+      if (!user.username) {
+        throw new ApiError(
+          400,
+          "Please set a username in your profile to post anonymously"
+        );
+      }
+    }
+
+    // Handle multiple image uploads to Cloudinary
+    const imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const cloudResp = await uploadToCloudinary(file.path);
+        if (cloudResp?.secure_url) {
+          imageUrls.push(cloudResp.secure_url);
+        }
+      }
+    }
+
+    // Create post
+    const post = await Post.create({
+      postId: uuidv4(),
+      userId: req.user._id,
+      type,
+      itemName,
+      description,
+      location: location || "",
+      images: imageUrls,
+      rewardAmount: rewardAmount || 0,
+      isAnonymous: isAnonymous || false,
+      category: category.toLowerCase(),
+      tags: tags || [],
+    });
+
+    // Populate user info
+    const populatedPost = await Post.findById(post._id).populate(
+      "userId",
+      "fullName username email profileImage"
+    );
+
+    return res
+      .status(201)
+      .json(new ApiResponse(201, populatedPost, "Post created successfully"));
+  } catch (error) {
+    // Clean up ALL temp files on ANY error
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        if (file.path && fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log("🗑️ Temp file cleaned up after error:", file.path);
+        }
+      });
+    }
+
+    // Re-throw the error so asyncHandler can handle it
+    throw error;
   }
-
-  const post = await Post.create({
-    postId: uuidv4(),
-    userId: req.user._id,
-    type,
-    itemName,
-    description,
-    location: location || "",
-    images: images || [],
-    rewardAmount: rewardAmount || 0,
-    isAnonymous: isAnonymous || false,
-    category: category.toLowerCase(),
-    tags: tags || [],
-  });
-
-  const populatedPost = await Post.findById(post._id).populate(
-    "userId",
-    "fullName username email profileImage"
-  );
-
-  return res.status(201).json(new ApiResponse(201, populatedPost, "Post created successfully"));
 });
 
 /**
@@ -143,6 +210,8 @@ const getAllPosts = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const getPostById = asyncHandler(async (req, res) => {
+  console.log("Requested postId:", req.params.postId);
+
   const { postId } = req.params;
 
   const post = await Post.findOne({ postId }).populate(
@@ -215,38 +284,65 @@ const getMyPosts = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const updatePost = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
-  const { description, location, images, rewardAmount, tags } = req.body;
+  try {
+    const { postId } = req.params;
+    const { description, location, rewardAmount, tags } = req.body;
 
-  // Find post
-  const post = await Post.findOne({ postId });
+    // Find post
+    const post = await Post.findOne({ postId });
 
-  if (!post) {
-    throw new ApiError(404, "Post not found");
+    if (!post) {
+      throw new ApiError(404, "Post not found");
+    }
+
+    // Check ownership
+    if (post.userId.toString() !== req.user._id.toString()) {
+      throw new ApiError(403, "You are not authorized to update this post");
+    }
+
+    // Update fields
+    if (description) post.description = description;
+    if (location) post.location = location;
+    if (rewardAmount !== undefined) post.rewardAmount = rewardAmount;
+    if (tags) post.tags = tags;
+
+    // Handle new images upload if provided
+    if (req.files && req.files.length > 0) {
+      const imageUrls = [];
+      for (const file of req.files) {
+        const cloudResp = await uploadToCloudinary(file.path);
+        if (cloudResp?.secure_url) {
+          imageUrls.push(cloudResp.secure_url);
+        }
+      }
+      // Append new images to existing ones
+      post.images = [...post.images, ...imageUrls];
+    }
+
+    await post.save();
+
+    const updatedPost = await Post.findById(post._id).populate(
+      "userId",
+      "fullName username email profileImage"
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedPost, "Post updated successfully"));
+  } catch (error) {
+    // Clean up ALL temp files on ANY error
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        if (file.path && fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log("🗑️ Temp file cleaned up after error:", file.path);
+        }
+      });
+    }
+
+    // Re-throw the error
+    throw error;
   }
-
-  // Check ownership
-  if (post.userId.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You are not authorized to update this post");
-  }
-
-  // Update fields
-  if (description) post.description = description;
-  if (location) post.location = location;
-  if (images) post.images = images;
-  if (rewardAmount !== undefined) post.rewardAmount = rewardAmount;
-  if (tags) post.tags = tags;
-
-  await post.save();
-
-  const updatedPost = await Post.findById(post._id).populate(
-    "userId",
-    "fullName username email profileImage"
-  );
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, updatedPost, "Post updated successfully"));
 });
 
 /**
