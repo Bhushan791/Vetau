@@ -63,53 +63,64 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
 // ============================================
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { fullName, username, email, password, address, authType } = req.body;
+  try {
+    const { fullName, username, email, password, address, authType } = req.body;
 
-  // Validate required fields
-  if (!fullName || !username || !authType) {
-    throw new ApiError(400, "Full name, username, and authType are required");
+    // Validate required fields
+    if (!fullName || !username || !authType) {
+      throw new ApiError(400, "Full name, username, and authType are required");
+    }
+
+    if (authType === "normal" && (!email || !password)) {
+      throw new ApiError(400, "Email and password are required for normal signup");
+    }
+
+    // Check for existing user
+    const existingUser = await User.findOne({ 
+      $or: [{ email }, { username }] 
+    });
+    
+    if (existingUser) {
+      throw new ApiError(409, "User with this email or username already exists");
+    }
+
+    // Handle profile image upload
+    let profileImageUrl = "";
+    if (req.file?.path) {
+      const cloudResp = await uploadToCloudinary(req.file.path);
+      profileImageUrl = cloudResp?.secure_url || "";
+    }
+
+    // Create user
+    const newUser = await User.create({
+      userId: uuidv4(),
+      fullName,
+      username: username.toLowerCase(),
+      email: email?.toLowerCase(),
+      password,
+      address: address || "",
+      profileImage: profileImageUrl,
+      authType,
+    });
+
+    // Get user without sensitive data
+    const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
+
+    return res.status(201).json(
+      new ApiResponse(201, { user: createdUser }, "User registered successfully")
+    );
+    
+  } catch (error) {
+    // Clean up temp file on ANY error
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+      console.log("🗑️ Temp file cleaned up after registration error:", req.file.path);
+    }
+    
+    // Re-throw the error so asyncHandler can handle it
+    throw error;
   }
-
-  if (authType === "normal" && (!email || !password)) {
-    throw new ApiError(400, "Email and password are required for normal signup");
-  }
-
-  // Check for existing user
-  const existingUser = await User.findOne({ 
-    $or: [{ email }, { username }] 
-  });
-  
-  if (existingUser) {
-    throw new ApiError(409, "User with this email or username already exists");
-  }
-
-  // Handle profile image upload
-  let profileImageUrl = "";
-  if (req.file?.path) {
-    const cloudResp = await uploadToCloudinary(req.file.path);
-    profileImageUrl = cloudResp?.secure_url || "";
-  }
-
-  // Create user
-  const newUser = await User.create({
-    userId: uuidv4(),
-    fullName,
-    username: username.toLowerCase(),
-    email: email?.toLowerCase(),
-    password,
-    address: address || "",
-    profileImage: profileImageUrl,
-    authType,
-  });
-
-  // Get user without sensitive data
-  const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
-
-  return res.status(201).json(
-    new ApiResponse(201, { user: createdUser }, "User registered successfully")
-  );
 });
-
 const loginUser = asyncHandler(async (req, res) => {
   const { email, username, password } = req.body;
 
