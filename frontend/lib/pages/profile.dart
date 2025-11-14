@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/config/api_constants.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String apiBaseUrl = 'http://192.168.1.68:8000/api/v1/users';
+const String apiBaseUrl = ApiConstants.baseUrl;
+
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/config/api_constants.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 const Color primaryBlue = Color(0xFF4285F4);
 const Color secondaryGray = Color(0xFFE0E0E0);
 const double cardPadding = 24.0;
-const String apiBaseUrl = 'http://192.168.1.68:8000/api/v1/users';
+const String apiBaseUrl = ApiConstants.baseUrl;
 
 // --- Custom TextField Widget ---
 class LabeledInputField extends StatelessWidget {
