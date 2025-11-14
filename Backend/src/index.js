@@ -20,7 +20,7 @@ connectDB()
     })
 })
 .catch((err)=> { 
-    console.log("Failed connection", err) 
+    console.log("Failed connection!", err) 
 
 }) 
 
