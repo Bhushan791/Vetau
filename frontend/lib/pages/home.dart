@@ -64,7 +64,7 @@ class _HomePageState extends State<HomePage> {
               print("Notification tapped");
             },
             onProfileTap: () {
-              print("Profile tapped");
+              Navigator.pushNamed(context, '/profile');
             },
           ),
         ),
