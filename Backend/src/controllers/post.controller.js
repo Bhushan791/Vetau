@@ -2,7 +2,7 @@ import { Post } from "../models/post.model.js";
 import { Category } from "../models/category.model.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { v4 as uuidv4 } from "uuid";
