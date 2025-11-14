@@ -8,6 +8,9 @@ import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import passport from "../config/passport.js";
+import fs from "fs";
+import path from "path"; 
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================

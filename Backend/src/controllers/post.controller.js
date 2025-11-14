@@ -7,7 +7,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
-
+import fs from "fs";
+import path from "path"; 
 // ============================================
 // POST CONTROLLERS
 // ============================================
