@@ -70,7 +70,7 @@ const registerUser = asyncHandler(async (req, res) => {
     const { fullName, username, email, password, address, authType } = req.body;
 
     // Validate required fields
-    if (!fullName || !username || !authType) {
+    if (!fullName || !email || !authType) {
       throw new ApiError(400, "Full name, username, and authType are required");
     }
 
