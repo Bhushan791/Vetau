@@ -65,9 +65,8 @@ console.log("📁 Files:", req.files);
     const categoryExists = await Category.findOne({
       name: category.toLowerCase(),
     });
-    if (!categoryExists) {
-      throw new ApiError(404, "Category not found");
-    }
+  let finalCategory = categoryExists ? category.toLowerCase() : "other";
+
 
     // If anonymous, check if user has username set
     if (isAnonymous) {
