@@ -61,6 +61,22 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
   };
   await transporter.sendMail(mailOptions);
 };
+
+// ============================================
+// AUTH CODE STORAGE (Use Redis in production)
+// ============================================
+const authCodes = new Map();
+
+// Cleanup expired codes every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, data] of authCodes.entries()) {
+    if (now > data.expires) {
+      authCodes.delete(code);
+    }
+  }
+}, 5 * 60 * 1000);
+
 // ============================================
 // AUTHENTICATION CONTROLLERS
 // ============================================
@@ -70,21 +86,28 @@ const registerUser = asyncHandler(async (req, res) => {
     const { fullName, username, email, password, address, authType } = req.body;
 
     // Validate required fields
-    if (!fullName || !email || !authType) {
-      throw new ApiError(400, "Full name, username, and authType are required");
+    if (!fullName || !authType) {
+      throw new ApiError(400, "Full name and authType are required");
     }
 
     if (authType === "normal" && (!email || !password)) {
       throw new ApiError(400, "Email and password are required for normal signup");
     }
 
-    // Check for existing user
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    });
-    
-    if (existingUser) {
-      throw new ApiError(409, "User with this email or username already exists");
+    // Check for existing user by email (if provided)
+    if (email) {
+      const existingUserByEmail = await User.findOne({ email: email.toLowerCase() });
+      if (existingUserByEmail) {
+        throw new ApiError(409, "User with this email already exists");
+      }
+    }
+
+    // Check for existing username (if provided)
+    if (username) {
+      const existingUserByUsername = await User.findOne({ username: username.toLowerCase() });
+      if (existingUserByUsername) {
+        throw new ApiError(409, "Username already taken");
+      }
     }
 
     // Handle profile image upload
@@ -94,17 +117,24 @@ const registerUser = asyncHandler(async (req, res) => {
       profileImageUrl = cloudResp?.secure_url || "";
     }
 
-    // Create user
-    const newUser = await User.create({
+    // Create user data object
+    const userData = {
       userId: uuidv4(),
       fullName,
-      username: username.toLowerCase(),
       email: email?.toLowerCase(),
       password,
       address: address || "",
       profileImage: profileImageUrl,
       authType,
-    });
+    };
+
+    // Add username only if provided
+    if (username) {
+      userData.username = username.toLowerCase();
+    }
+
+    // Create user
+    const newUser = await User.create(userData);
 
     // Get user without sensitive data
     const createdUser = await User.findById(newUser._id).select("-password -refreshToken");
@@ -120,22 +150,27 @@ const registerUser = asyncHandler(async (req, res) => {
       console.log("🗑️ Temp file cleaned up after registration error:", req.file.path);
     }
     
-    // Re-throw the error so asyncHandler can handle it
     throw error;
   }
 });
+
 const loginUser = asyncHandler(async (req, res) => {
   const { email, username, password } = req.body;
 
-  // Validate input
+  // Validate input - need at least email OR username
   if (!username && !email) {
     throw new ApiError(400, "Username or email is required");
   }
 
+  // Build query to find user
+  const query = {};
+  if (email) query.email = email.toLowerCase();
+  if (username) query.username = username.toLowerCase();
+
   // Find user
-  const user = await User.findOne({ 
-    $or: [{ username }, { email }] 
-  });
+  const user = await User.findOne(
+    email && username ? { $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] } : query
+  );
 
   if (!user) {
     throw new ApiError(404, "User does not exist");
@@ -160,7 +195,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const options = { httpOnly: true, secure: true };
 
-  // Set refresh token in cookie and return access token in response
   return res
     .status(200)
     .cookie("refreshToken", refreshToken, options)
@@ -174,7 +208,6 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-  // Clear refresh token from database
   await User.findByIdAndUpdate(
     req.user._id,
     { $unset: { refreshToken: 1 } },
@@ -212,7 +245,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Refresh token is expired or used");
     }
 
-    // Generate new tokens
     const { accessToken, refreshToken: newRefreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const options = { httpOnly: true, secure: true };
@@ -232,32 +264,34 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-
-
 const googleAuth = passport.authenticate("google", {
   scope: ["profile", "email"],
 });
 
-// Google OAuth Callback
 const googleAuthCallback = [
   passport.authenticate("google", { 
     session: false, 
     failureRedirect: "http://localhost:3000/login?error=auth_failed" 
   }),
   asyncHandler(async (req, res) => {
-    // Generate tokens for the authenticated user
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(req.user._id);
+    
+    const code = uuidv4();
+    authCodes.set(code, {
+      userId: req.user._id,
+      accessToken,
+      refreshToken,
+      expires: Date.now() + 5 * 60 * 1000
+    });
 
-    // Get user data
-    const user = await User.findById(req.user._id).select("-password -refreshToken");
-
-    // Redirect to frontend with tokens (change URL based on your frontend)
-    const redirectUrl = `http://localhost:3000/auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`;
+    const isMobileApp = req.query.platform === 'mobile';
+    const redirectUrl = isMobileApp 
+      ? `myapp://auth/callback?code=${code}`
+      : `http://localhost:3000/auth/callback?code=${code}`;
     
     res.redirect(redirectUrl);
   }),
 ];
-
 
 // ============================================
 // PROFILE MANAGEMENT
@@ -270,15 +304,26 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, address } = req.body;
+  const { fullName, address, username } = req.body;
 
-  if (!fullName && !address) {
+  if (!fullName && !address && !username) {
     throw new ApiError(400, "At least one field is required to update");
   }
 
   const updateFields = {};
   if (fullName) updateFields.fullName = fullName;
   if (address) updateFields.address = address;
+  if (username) {
+    // Check if username already exists
+    const existingUser = await User.findOne({ 
+      username: username.toLowerCase(),
+      _id: { $ne: req.user._id } 
+    });
+    if (existingUser) {
+      throw new ApiError(409, "Username already taken");
+    }
+    updateFields.username = username.toLowerCase();
+  }
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
@@ -298,14 +343,12 @@ const updateUserProfileImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Profile image file is required");
   }
 
-  // Delete old image from Cloudinary
   const user = await User.findById(req.user?._id);
   if (user.profileImage) {
     const publicId = user.profileImage.split('/').pop().split('.')[0];
     await deleteFromCloudinary(publicId);
   }
 
-  // Upload new image
   const uploadedImage = await uploadToCloudinary(profileImageLocalPath);
 
   if (!uploadedImage?.url) {
@@ -326,14 +369,12 @@ const updateUserProfileImage = asyncHandler(async (req, res) => {
 const deleteAccount = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
 
-  // Delete profile image from Cloudinary
   const user = await User.findById(userId);
   if (user.profileImage) {
     const publicId = user.profileImage.split('/').pop().split('.')[0];
     await deleteFromCloudinary(publicId);
   }
 
-  // Delete user
   await User.findByIdAndDelete(userId);
 
   const options = { httpOnly: true, secure: true };
@@ -402,15 +443,15 @@ const forgotPassword = asyncHandler(async (req, res) => {
   user.passwordResetOTPExpiry = Date.now() + 10 * 60 * 1000;
   await user.save({ validateBeforeSave: false });
 
- try {
-  await sendOTPEmail(email, otp, "password reset");
-} catch (error) {
-  console.error("EMAIL ERROR DETAILS:", error); // Add this
-  user.passwordResetOTP = undefined;
-  user.passwordResetOTPExpiry = undefined;
-  await user.save({ validateBeforeSave: false });
-  throw new ApiError(500, "Failed to send OTP email. Please try again.");
-}
+  try {
+    await sendOTPEmail(email, otp, "password reset");
+  } catch (error) {
+    console.error("EMAIL ERROR DETAILS:", error);
+    user.passwordResetOTP = undefined;
+    user.passwordResetOTPExpiry = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new ApiError(500, "Failed to send OTP email. Please try again.");
+  }
 
   return res
     .status(200)
@@ -481,6 +522,33 @@ const resetPasswordWithOTP = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Password reset successfully. You can now login."));
 });
 
+const exchangeAuthCode = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+
+  if (!code) {
+    throw new ApiError(400, "Auth code is required");
+  }
+
+  const authData = authCodes.get(code);
+
+  if (!authData || Date.now() > authData.expires) {
+    authCodes.delete(code);
+    throw new ApiError(401, "Invalid or expired auth code");
+  }
+
+  authCodes.delete(code);
+
+  const user = await User.findById(authData.userId).select("-password -refreshToken");
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      user,
+      accessToken: authData.accessToken,
+      refreshToken: authData.refreshToken
+    }, "Authentication successful")
+  );
+});
+
 // ============================================
 // EXPORTS
 // ============================================
@@ -500,4 +568,5 @@ export {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
+  exchangeAuthCode
 };
