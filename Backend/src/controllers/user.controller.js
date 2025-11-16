@@ -455,11 +455,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
   try {
     await sendOTPEmail(email, otp, "password reset");
   } catch (error) {
-    console.error("EMAIL ERROR DETAILS:", error);
+    console.error("EMAIL ERROR DETAILS:", error); // This logs to Render
     user.passwordResetOTP = undefined;
     user.passwordResetOTPExpiry = undefined;
     await user.save({ validateBeforeSave: false });
-    throw new ApiError(500, "Failed to send OTP email. Please try again.");
+    
+    // CHANGED: Show actual error to you
+    throw new ApiError(500, `Email send failed: ${error.message}`);
   }
 
   return res
