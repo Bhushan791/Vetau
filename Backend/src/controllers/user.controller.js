@@ -35,39 +35,104 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 
 
-const generateOTP = () => crypto.randomInt(100000, 999999).toString();
+// const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+// const transporter = nodemailer.createTransport({
+//   host: "smtp.gmail.com",
+//   port: 465,
+//   secure: true,
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASSWORD,
+//   },
+// });
 
-const sendOTPEmail = async (email, otp, purpose = "password reset") => {
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: email,
-    subject: `Lost and Found - Your OTP for ${purpose}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
-        <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
-          <h2 style="color: #333;">Lost and Found App</h2>
-          <p style="font-size: 16px; color: #555;">Your OTP for ${purpose} is:</p>
-          <div style="background-color: #007bff; color: white; font-size: 32px; font-weight: bold; padding: 15px; text-align: center; border-radius: 5px; letter-spacing: 5px;">
-            ${otp}
-          </div>
-          <p style="margin-top: 20px; color: #777; font-size: 14px;">This OTP is valid for 10 minutes.</p>
-          <p style="color: #777; font-size: 14px;">If you didn't request this, please ignore this email.</p>
-        </div>
-      </div>
-    `,
-  };
-  await transporter.sendMail(mailOptions);
+// const sendOTPEmail = async (email, otp, purpose = "password reset") => {
+//   const mailOptions = {
+//     from: process.env.EMAIL_FROM,
+//     to: email,
+//     subject: `Lost and Found - Your OTP for ${purpose}`,
+//     html: `
+//       <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+//         <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+//           <h2 style="color: #333;">Lost and Found App</h2>
+//           <p style="font-size: 16px; color: #555;">Your OTP for ${purpose} is:</p>
+//           <div style="background-color: #007bff; color: white; font-size: 32px; font-weight: bold; padding: 15px; text-align: center; border-radius: 5px; letter-spacing: 5px;">
+//             ${otp}
+//           </div>
+//           <p style="margin-top: 20px; color: #777; font-size: 14px;">This OTP is valid for 10 minutes.</p>
+//           <p style="color: #777; font-size: 14px;">If you didn't request this, please ignore this email.</p>
+//         </div>
+//       </div>
+//     `,
+//   };
+//   await transporter.sendMail(mailOptions);
+// };
+
+
+
+import { google } from "googleapis";
+
+
+// OTP generator
+export const generateOTP = () => crypto.randomInt(100000, 999999).toString();
+
+// OAuth2 setup for OTP sender
+const oAuth2Client = new google.auth.OAuth2(
+  process.env.OTP_GOOGLE_CLIENT_ID,
+  process.env.OTP_GOOGLE_CLIENT_SECRET,
+  "https://developers.google.com/oauthplayground"
+);
+
+oAuth2Client.setCredentials({ refresh_token: process.env.OTP_REFRESH_TOKEN });
+
+// Create transporter for OTP emails
+const createOTPTransporter = async () => {
+  const accessToken = (await oAuth2Client.getAccessToken()).token;
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      type: "OAuth2",
+      user: process.env.OTP_EMAIL_USER,
+      clientId: process.env.OTP_GOOGLE_CLIENT_ID,
+      clientSecret: process.env.OTP_GOOGLE_CLIENT_SECRET,
+      refreshToken: process.env.OTP_REFRESH_TOKEN,
+      accessToken,
+    },
+  });
 };
+
+// Send OTP email
+export const sendOTPEmail = async (email, otp, purpose = "password reset") => {
+  try {
+    const transporter = await createOTPTransporter();
+    const info = await transporter.sendMail({
+      from: process.env.OTP_EMAIL_FROM,
+      to: email,
+      subject: `Lost and Found - Your OTP for ${purpose}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+            <h2 style="color: #333;">Lost and Found App</h2>
+            <p style="font-size: 16px; color: #555;">Your OTP for ${purpose} is:</p>
+            <div style="background-color: #007bff; color: white; font-size: 32px; font-weight: bold; padding: 15px; text-align: center; border-radius: 5px; letter-spacing: 5px;">
+              ${otp}
+            </div>
+            <p style="margin-top: 20px; color: #777; font-size: 14px;">This OTP is valid for 10 minutes.</p>
+            <p style="color: #777; font-size: 14px;">If you didn't request this, please ignore this email.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    console.log("OTP email sent: ", info.messageId);
+  } catch (err) {
+    console.error("Error sending OTP email: ", err);
+    throw new Error("Failed to send OTP email");
+  }
+};
+
 
 // ============================================
 // AUTHENTICATION CONTROLLERS
