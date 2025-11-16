@@ -32,17 +32,14 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  port: 465,  // ← Changed from 587
+  secure: true,  // ← Changed to true (use SSL)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
   },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
+  connectionTimeout: 60000,
+  greetingTimeout: 60000,
 });
 
 
