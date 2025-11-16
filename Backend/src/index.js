@@ -20,7 +20,7 @@ const port = process.env.PORT || 8000;
 connectDB()
   .then(() => {
     app.listen(port, () => {
-      console.log(`✅ Server is running at PORT: ${port}`);
+      console.log(`Server is running at PORT: ${port}`);
     });
 
     app.on("error", (error) => {
@@ -29,10 +29,25 @@ connectDB()
     });
   })
   .catch((err) => {
-    console.error("❌ Failed MongoDB connection:", err);
+    console.error("❌Failed MongoDB connection:", err);
   });
 
+
+
+
+
+
+
+
+
+
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Simple test route
+
 app.get("/", (req, res) => {
-  res.send("<h1>Everything is working — GOOD TO GO!</h1>");
+  res.sendFile(path.join(__dirname, "serverWorkingFlag.html"));
 });

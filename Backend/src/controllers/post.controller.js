@@ -19,8 +19,9 @@ import path from "path";
  */
 const createPost = asyncHandler(async (req, res) => {
   // Debug log
-console.log("📦 Request body:", req.body);
-console.log("📁 Files:", req.files);
+// console.log("📦 Request body:", req.body);
+// console.log("📁 Files:", req.files);
+
   try {
     const {
       type,
@@ -65,6 +66,7 @@ console.log("📁 Files:", req.files);
     const categoryExists = await Category.findOne({
       name: category.toLowerCase(),
     });
+    
   let finalCategory = categoryExists ? category.toLowerCase() : "other";
 
 
