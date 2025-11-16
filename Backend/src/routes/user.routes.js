@@ -14,7 +14,7 @@ import {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
-   exchangeAuthCode,
+   
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -68,18 +68,8 @@ router.route("/google").get(googleAuth);
 router.route("/google/callback").get(...googleAuthCallback);
 
 
-
-/**
- * @route   POST /api/v1/users/exchange-code
- * @desc    Exchange auth code for tokens
- * @access  Public
- */
-router.route("/exchange-code").post(exchangeAuthCode);
-
-
-
 // ============================================
-// PASSWORD RESET ROUTES (Public - OTP based)       ----------  TESTING PASSED
+// PASSWORD RESET ROUTES (Public - OTP based)       ----------  TESTING PASSED -- production testing -issues
 // ============================================
 
 /**

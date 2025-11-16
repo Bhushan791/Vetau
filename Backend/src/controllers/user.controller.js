@@ -68,20 +68,6 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
   };
   await transporter.sendMail(mailOptions);
 };
-// ============================================
-// AUTH CODE STORAGE (Use Redis in production)
-// ============================================
-const authCodes = new Map();
-
-// Cleanup expired codes every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, data] of authCodes.entries()) {
-    if (now > data.expires) {
-      authCodes.delete(code);
-    }
-  }
-}, 5 * 60 * 1000);
 
 // ============================================
 // AUTHENTICATION CONTROLLERS
@@ -274,31 +260,27 @@ const googleAuth = passport.authenticate("google", {
   scope: ["profile", "email"],
 });
 
+// Google OAuth Callback
 const googleAuthCallback = [
   passport.authenticate("google", { 
     session: false, 
     failureRedirect: "http://localhost:3000/login?error=auth_failed" 
   }),
   asyncHandler(async (req, res) => {
+    // Generate tokens for the authenticated user
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(req.user._id);
-    
-    const code = uuidv4();
-    authCodes.set(code, {
-      userId: req.user._id,
-      accessToken,
-      refreshToken,
-      expires: Date.now() + 5 * 60 * 1000
-    });
 
-    const isMobileApp = req.query.platform === 'mobile';
-    const redirectUrl = isMobileApp 
-      ? `myapp://auth/callback?code=${code}`
-      : `http://localhost:3000/auth/callback?code=${code}`;
+    // Get user data
+    const user = await User.findById(req.user._id).select("-password -refreshToken");
+
+    // Redirect to frontend with tokens (change URL based on your frontend)
+    // const redirectUrl = `http://localhost:3000/auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`;
     
-    res.redirect(redirectUrl);
+    // res.redirect(redirectUrl);
+
+    return res.redirect(`vetau://auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`);
   }),
 ];
-
 // ============================================
 // PROFILE MANAGEMENT
 // ============================================
@@ -530,32 +512,7 @@ const resetPasswordWithOTP = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Password reset successfully. You can now login."));
 });
 
-const exchangeAuthCode = asyncHandler(async (req, res) => {
-  const { code } = req.body;
 
-  if (!code) {
-    throw new ApiError(400, "Auth code is required");
-  }
-
-  const authData = authCodes.get(code);
-
-  if (!authData || Date.now() > authData.expires) {
-    authCodes.delete(code);
-    throw new ApiError(401, "Invalid or expired auth code");
-  }
-
-  authCodes.delete(code);
-
-  const user = await User.findById(authData.userId).select("-password -refreshToken");
-
-  return res.status(200).json(
-    new ApiResponse(200, {
-      user,
-      accessToken: authData.accessToken,
-      refreshToken: authData.refreshToken
-    }, "Authentication successful")
-  );
-});
 
 // ============================================
 // EXPORTS
@@ -576,5 +533,5 @@ export {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
-  exchangeAuthCode
+
 };
