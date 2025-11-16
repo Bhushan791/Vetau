@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/config/google_oauth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-// --- Constants and Custom Widgets ---
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const Color primaryBlue = Color(0xFF4285F4);
 const Color secondaryGray = Color(0xFFE0E0E0);
 const double cardPadding = 24.0;
 const String apiBaseUrl = ApiConstants.baseUrl;
 
-
-// Custom TextField that includes a label and a prefix icon
+// ---------------------------
+// Labeled Input Field
+// ---------------------------
 class LabeledInputField extends StatelessWidget {
   final String label;
   final String hintText;
@@ -93,27 +95,9 @@ class LabeledInputField extends StatelessWidget {
   }
 }
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Registration Form',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: const Color(0xFFF4F4F4),
-      ),
-      home: const RegisterPage(),
-    );
-  }
-}
-
+// ---------------------------
+// Register Page
+// ---------------------------
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -122,14 +106,13 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // Form Controllers
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // State variables
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
   bool _isLoading = false;
@@ -143,66 +126,54 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _togglePasswordVisibility() {
-    setState(() {
-      _isPasswordObscured = !_isPasswordObscured;
-    });
-  }
-
-  void _toggleConfirmPasswordVisibility() {
-    setState(() {
-      _isConfirmPasswordObscured = !_isConfirmPasswordObscured;
-    });
-  }
-
-  // Validation Functions
+  // ---------------------------
+  // VALIDATIONS
+  // ---------------------------
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Email is required';
-    }
+    if (value == null || value.isEmpty) return 'Email is required';
     final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Please enter a valid email';
-    }
+    if (!emailRegex.hasMatch(value)) return 'Please enter a valid email';
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
+    if (value == null || value.isEmpty) return 'Password is required';
+    if (value.length < 6) return 'Password must be at least 6 characters';
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please confirm your password';
-    }
-    if (value != _passwordController.text) {
-      return 'Passwords do not match';
-    }
+    if (value == null || value.isEmpty) return 'Please confirm your password';
+    if (value != _passwordController.text) return 'Passwords do not match';
     return null;
   }
 
-  // Register Function
-  Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  // ---------------------------
+  // SHARED PREFERENCES SAVE
+  // ---------------------------
+  Future<void> _saveUserData({
+    required String token,
+    required String fullName,
+    required String email,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', token);
+    await prefs.setString('fullName', fullName);
+    await prefs.setString('email', email);
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
+  // ---------------------------
+  // REGISTER API CALL
+  // ---------------------------
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/register/'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'fullName': _nameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -211,23 +182,23 @@ class _RegisterPageState extends State<RegisterPage> {
         }),
       );
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
 
-      // Handle response
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
+      final data = jsonDecode(response.body);
+
+      print('STATUS: ${response.statusCode}');
+      print('BODY: $data');
 
       if (response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        
-        // Show success message
+        // Save token and user info
+        await _saveUserData(
+          token: data['accessToken'],
+          fullName: data['user']['fullName'],
+          email: data['user']['email'],
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(responseData['message'] ?? 'Registration successful'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Registration successful!'), backgroundColor: Colors.green),
         );
 
         // Clear form
@@ -236,36 +207,32 @@ class _RegisterPageState extends State<RegisterPage> {
         _passwordController.clear();
         _confirmPasswordController.clear();
 
-        // Navigate to login or home screen after a short delay
+        // Navigate to home after delay
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pushNamed(context, '/login');
-          }
+          Navigator.pushReplacementNamed(context, '/home');
         });
       } else {
-        final errorData = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorData['message'] ?? 'Registration failed'),
+            content: Text(data['message'] ?? 'Registration failed'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
-      print( "Registration Error: $e");
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text('Error: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
+  // ---------------------------
+  // BUILD UI
+  // ---------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,31 +262,21 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: <Widget>[
                     const Text(
                       'Create an account',
-                      textAlign: TextAlign.start,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 30),
 
-                    // Name Input
+                    // Name
                     LabeledInputField(
                       label: 'Name',
                       hintText: 'Enter your full name',
                       prefixIcon: Icons.person_outline,
                       controller: _nameController,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Name is required';
-                        }
-                        return null;
-                      },
+                      validator: (value) => value!.isEmpty ? 'Name is required' : null,
                     ),
                     const SizedBox(height: 20),
 
-                    // Email Input
+                    // Email
                     LabeledInputField(
                       label: 'Email',
                       hintText: 'example@vetau.com',
@@ -329,27 +286,31 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Password Input
+                    // Password
                     LabeledInputField(
                       label: 'Password',
                       hintText: '*********',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isObscured: _isPasswordObscured,
-                      onToggleVisibility: _togglePasswordVisibility,
+                      onToggleVisibility: () {
+                        setState(() => _isPasswordObscured = !_isPasswordObscured);
+                      },
                       controller: _passwordController,
                       validator: _validatePassword,
                     ),
                     const SizedBox(height: 20),
 
-                    // Confirm Password Input
+                    // Confirm Password
                     LabeledInputField(
                       label: 'Confirm Password',
                       hintText: '*********',
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isObscured: _isConfirmPasswordObscured,
-                      onToggleVisibility: _toggleConfirmPasswordVisibility,
+                      onToggleVisibility: () {
+                        setState(() => _isConfirmPasswordObscured = !_isConfirmPasswordObscured);
+                      },
                       controller: _confirmPasswordController,
                       validator: _validateConfirmPassword,
                     ),
@@ -363,58 +324,37 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryBlue,
                           disabledBackgroundColor: Colors.grey[300],
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
                         ),
                         child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  strokeWidth: 2,
-                                ),
+                            ? const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                strokeWidth: 2,
                               )
                             : const Text(
                                 'Register',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                               ),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // Separator
-                    const Center(
-                      child: Text(
-                        'or',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
+                    const Center(child: Text('or', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500))),
                     const SizedBox(height: 20),
 
-                    // Google Button
+                    // Google Button (UI only, backend integration can be added later)
+                    // Google Sign Up Button
                     SizedBox(
                       height: 50,
                       child: OutlinedButton(
                         onPressed: () {
-                          print('Google Sign Up Button Pressed');
+                          GoogleOAuthService.openGoogleLogin(context); // 🚀 Start Google Auth
                         },
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
                           side: BorderSide(color: secondaryGray, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
                           elevation: 0,
                         ),
                         child: Row(
@@ -422,23 +362,18 @@ class _RegisterPageState extends State<RegisterPage> {
                           children: [
                             Text(
                               'G',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryBlue.withOpacity(0.8)),
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryBlue.withOpacity(0.8)),
                             ),
                             const SizedBox(width: 10),
                             const Text(
                               'Sign Up with Google',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 20),
 
                     // Login link
@@ -449,19 +384,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         },
                         child: RichText(
                           text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                             children: const [
                               TextSpan(text: 'Already have an account? '),
-                              TextSpan(
-                                text: 'Login',
-                                style: TextStyle(
-                                  color: primaryBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              TextSpan(text: 'Login', style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
