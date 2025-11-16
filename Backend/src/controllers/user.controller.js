@@ -5,7 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { v4 as uuidv4 } from "uuid";
 import jwt from "jsonwebtoken";
-import { Resend } from 'resend';
+import nodemailer from "nodemailer";
 
 import crypto from "crypto";
 import passport from "../config/passport.js";
@@ -34,11 +34,21 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+
 const generateOTP = () => crypto.randomInt(100000, 999999).toString();
 
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
+
 const sendOTPEmail = async (email, otp, purpose = "password reset") => {
-  await resend.emails.send({
+  const mailOptions = {
     from: process.env.EMAIL_FROM,
     to: email,
     subject: `Lost and Found - Your OTP for ${purpose}`,
@@ -55,7 +65,8 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
         </div>
       </div>
     `,
-  });
+  };
+  await transporter.sendMail(mailOptions);
 };
 // ============================================
 // AUTH CODE STORAGE (Use Redis in production)
