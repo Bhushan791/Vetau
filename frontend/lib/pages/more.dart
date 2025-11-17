@@ -25,7 +25,7 @@ class _MorePageState extends State<MorePage> {
           child: HomeAppBar(
             rewardPoints: 120.76,
             onNotificationTap: () {
-              print("Notification tapped");
+              Navigator.pushNamed(context, '/login');
             },
             onProfileTap: () {
               print("Profile tapped");

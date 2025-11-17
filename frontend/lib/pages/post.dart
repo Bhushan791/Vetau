@@ -4,6 +4,9 @@ import 'package:frontend/pages/mapSelectPage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/components/bottomNav.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 enum PostType { lost, found }
 
@@ -185,12 +188,64 @@ class _PostPageState extends State<PostPage> {
 
 
   // Submit post
-  void _submitPost() {
-    final payload = _buildPayload();
-    print("Payload ready to send to backend: $payload");
+  void _submitPost() async {
+    // Future payload (KEEP THIS) ---------------------------
+    final prefs = await SharedPreferences.getInstance();
+    final accessToken = prefs.getString('accessToken');
+    final futurePayload = _buildPayload();
+    print("Full payload (for future backend): $futurePayload");
+    // -------------------------------------------------------
 
-    // TODO: Implement your API call here
+    final uri = Uri.parse("https://vetau.onrender.com/api/v1/posts");
+
+    final request = http.MultipartRequest("POST", uri);
+
+    // Add text fields
+    request.fields['type'] =
+        _selectedPostType == PostType.lost ? "lost" : "found";
+
+    request.fields['itemName'] = _headingController.text.trim();
+    request.fields['category'] = "others"; // TEMP
+    request.fields['rewardAmount'] = _rewardController.text.trim();
+    request.fields['description'] = _descriptionController.text.trim();
+    request.fields['tags'] = _tagsController.text.trim();
+
+    // Location text only
+    request.fields['location'] = _locationController.text.trim();
+
+    // Add images
+    for (var img in _images) {
+      final file = await http.MultipartFile.fromPath('images', img.path);
+      request.files.add(file);
+    }
+
+    // ---------------------------------------
+    // ADD HEADERS (Authorization + Accept)
+    // ---------------------------------------
+    request.headers.addAll({
+      'Authorization': 'Bearer $accessToken',
+      'Accept': 'application/json',
+    });
+
+    print("Sending temporary API request...");
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    print("Response Status: ${response.statusCode}");
+    print("Response Body: ${response.body}");
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Post created successfully")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to create post")),
+      );
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {

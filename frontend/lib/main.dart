@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
-      initialRoute: '/home',
+      initialRoute: '/login',
 
       // STATIC ROUTES
       routes: {
