@@ -1,33 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:frontend/components/bottomNav.dart';
-
-// --- PLACEHOLDER COMPONENTS (Replace with your actual files) ---
-
-// // Placeholder for your BottomNav component
-// class BottomNav extends StatelessWidget {
-//   final int currentIndex;
-//   const BottomNav({super.key, required this.currentIndex});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return BottomNavigationBar(
-//       currentIndex: currentIndex,
-//       items: const [
-//         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-//         BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-//         BottomNavigationBarItem(icon: Icon(Icons.add_box), label: 'Post'),
-//         BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-//       ],
-//     );
-//   }
-// }
 
 // --- ENUM FOR POST TYPE SELECTION ---
 enum PostType { lost, found }
 
 // --- CUSTOM WIDGETS ---
-
-// A reusable widget for the Lost/Found selection buttons
 class PostTypeButton extends StatelessWidget {
   final String text;
   final PostType type;
@@ -57,7 +36,7 @@ class PostTypeButton extends StatelessWidget {
         elevation: isSelected ? 4 : 0,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
       child: Text(
@@ -73,7 +52,6 @@ class PostTypeButton extends StatelessWidget {
 }
 
 // --- MAIN PAGE IMPLEMENTATION ---
-
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -85,10 +63,71 @@ class _PostPageState extends State<PostPage> {
   PostType _selectedPostType = PostType.lost;
   bool _isAnonymous = false;
 
-  // Helper to create the titled sections (e.g., "Post Heading")
+  // --- IMAGE PICKER STATE ---
+  final ImagePicker _picker = ImagePicker();
+  List<XFile> _images = [];
+
+  // Pick multiple from gallery
+  Future<void> _pickImages() async {
+    final List<XFile> pickedImages = await _picker.pickMultiImage(
+      imageQuality: 85,
+    );
+
+    if (pickedImages.isNotEmpty) {
+      setState(() {
+        _images.addAll(pickedImages);
+      });
+    }
+  }
+
+  // Pick from camera
+  Future<void> _pickFromCamera() async {
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (photo != null) {
+      setState(() {
+        _images.add(photo);
+      });
+    }
+  }
+
+  // Bottom popup to choose source
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo),
+                title: const Text("Pick from Gallery"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImages();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text("Take a Photo"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFromCamera();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Section Title Widget
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 24.0, bottom: 8.0),
+      padding: const EdgeInsets.only(top: 24, bottom: 8),
       child: Text(
         title,
         style: const TextStyle(
@@ -100,7 +139,7 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  // Helper for input fields
+  // Input Field Widget
   Widget _buildInputField({
     required String hint,
     int maxLines = 1,
@@ -116,7 +155,7 @@ class _PostPageState extends State<PostPage> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.grey) : null,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
@@ -132,28 +171,23 @@ class _PostPageState extends State<PostPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        // Custom AppBar implementation
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          // Back arrow
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () => Navigator.pop(context),
           ),
-          // Title
           title: const Text(
             'Create Post',
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
           ),
           centerTitle: false,
-          // Post button
           actions: [
             Padding(
-              padding: const EdgeInsets.only(right: 8.0),
+              padding: const EdgeInsets.only(right: 8),
               child: TextButton(
                 onPressed: () {
-                  // Handle post submission logic
                   print('Post button tapped. Type: $_selectedPostType, Anonymous: $_isAnonymous');
                 },
                 child: const Text(
@@ -165,13 +199,12 @@ class _PostPageState extends State<PostPage> {
           ],
         ),
 
-        // Body containing the form
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Lost/Found Buttons
+              // Lost / Found Buttons
               Row(
                 children: [
                   Expanded(
@@ -194,51 +227,95 @@ class _PostPageState extends State<PostPage> {
                 ],
               ),
 
-              // 2. Post Heading
+              // Heading
               _buildSectionTitle('Post Heading'),
               _buildInputField(hint: 'e.g., Cat Lost near Lake Street'),
 
-              // 3. Post Description
+              // Description
               _buildSectionTitle('Post Description'),
               _buildInputField(
-                  hint: 'Share details about your lost/found item...', maxLines: 5),
+                hint: 'Share details about your lost/found item...',
+                maxLines: 5,
+              ),
 
-              // 4. Upload Image
+              // Upload Image Section
               _buildSectionTitle('Upload Image'),
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                    // Fix: BorderStyle only has 'solid' and 'none'.
-                    // Using BorderStyle.solid as 'dashed' is not a standard option in Box Border.
-                    // For a true dashed border, a package (like dotted_border) or CustomPainter is needed.
-                    style: BorderStyle.solid, 
-                    width: 2.0,
+              GestureDetector(
+                onTap: _showImageSourceSheet,
+                child: Container(
+                  height: 120,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300, width: 2),
                   ),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.cloud_upload_outlined, color: Colors.grey, size: 30),
-                    Text('Tap to upload image', style: TextStyle(color: Colors.grey)),
-                    Text('Max 5MB', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cloud_upload_outlined, color: Colors.grey, size: 30),
+                      Text('Tap to upload image', style: TextStyle(color: Colors.grey)),
+                      Text('Max 5MB', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
                 ),
               ),
 
-              // 5. Location
+              const SizedBox(height: 12),
+
+              // Preview of selected images
+              if (_images.isNotEmpty)
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _images.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) {
+                      return Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(_images[i].path),
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() => _images.removeAt(i));
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          )
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+              // Location
               _buildSectionTitle('Location'),
               _buildInputField(hint: 'Central Park, New York'),
               const SizedBox(height: 12),
+
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    // Handle map selection
                     print('Choose on Map tapped');
                   },
                   icon: const Icon(Icons.location_on_outlined, size: 20),
@@ -246,38 +323,38 @@ class _PostPageState extends State<PostPage> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     side: BorderSide(color: Colors.blue.shade700),
                     foregroundColor: Colors.blue.shade700,
                   ),
                 ),
               ),
+
               const Padding(
-                padding: EdgeInsets.only(top: 8.0),
+                padding: EdgeInsets.only(top: 8),
                 child: Text(
                   'Pinpoint the exact location for better visibility.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
 
-              // 6. Tags
+              // Tags
               _buildSectionTitle('Tags'),
               _buildInputField(hint: 'e.g., #petrescue, #lostcat, #dogwalker'),
               const Padding(
-                padding: EdgeInsets.only(top: 8.0),
+                padding: EdgeInsets.only(top: 8),
                 child: Text(
                   'Add relevant tags to help others find your post.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
 
-              // 7. Reward to Finder
+              // Reward
               _buildSectionTitle('Reward to Finder'),
-              _buildInputField(
-                  hint: 'e.g., 500', prefixIcon: Icons.currency_rupee),
+              _buildInputField(hint: 'e.g., 500', prefixIcon: Icons.currency_rupee),
 
-              // 8. Post Anonymously Switch
+              // Anonymous Switch
               _buildSectionTitle('Post Anonymously'),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -288,21 +365,17 @@ class _PostPageState extends State<PostPage> {
                   ),
                   Switch(
                     value: _isAnonymous,
-                    onChanged: (value) {
-                      setState(() {
-                        _isAnonymous = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _isAnonymous = value),
                     activeColor: Colors.blue,
                   ),
                 ],
               ),
-              const SizedBox(height: 30), // Extra space at the bottom
+
+              const SizedBox(height: 30),
             ],
           ),
         ),
 
-        // Bottom Navigation Bar (using your existing component)
         bottomNavigationBar: const BottomNav(currentIndex: 2),
       ),
     );
