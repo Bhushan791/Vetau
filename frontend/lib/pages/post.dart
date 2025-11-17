@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:frontend/pages/mapSelectPage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:frontend/components/bottomNav.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-// --- ENUM FOR POST TYPE SELECTION ---
 enum PostType { lost, found }
 
-// --- CUSTOM WIDGETS ---
 class PostTypeButton extends StatelessWidget {
   final String text;
   final PostType type;
@@ -51,7 +51,6 @@ class PostTypeButton extends StatelessWidget {
   }
 }
 
-// --- MAIN PAGE IMPLEMENTATION ---
 class PostPage extends StatefulWidget {
   const PostPage({super.key});
 
@@ -63,37 +62,35 @@ class _PostPageState extends State<PostPage> {
   PostType _selectedPostType = PostType.lost;
   bool _isAnonymous = false;
 
-  // --- IMAGE PICKER STATE ---
+  // Controllers for text fields
+  final TextEditingController _headingController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _tagsController = TextEditingController();
+  final TextEditingController _rewardController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+
+  // Images
   final ImagePicker _picker = ImagePicker();
   List<XFile> _images = [];
 
-  // Pick multiple from gallery
+  // Selected location
+  LatLng? _selectedLatLng;
+
+  // Pick multiple images from gallery
   Future<void> _pickImages() async {
-    final List<XFile> pickedImages = await _picker.pickMultiImage(
-      imageQuality: 85,
-    );
-
-    if (pickedImages.isNotEmpty) {
-      setState(() {
-        _images.addAll(pickedImages);
-      });
+    final List<XFile>? pickedImages = await _picker.pickMultiImage(imageQuality: 85);
+    if (pickedImages != null && pickedImages.isNotEmpty) {
+      setState(() => _images.addAll(pickedImages));
     }
   }
 
-  // Pick from camera
+  // Pick single image from camera
   Future<void> _pickFromCamera() async {
-    final XFile? photo = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (photo != null) {
-      setState(() {
-        _images.add(photo);
-      });
-    }
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    if (photo != null) setState(() => _images.add(photo));
   }
 
-  // Bottom popup to choose source
+  // Bottom sheet to choose image source
   void _showImageSourceSheet() {
     showModalBottomSheet(
       context: context,
@@ -124,28 +121,19 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  // Section Title Widget
+  // Section title helper
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
+      child: Text(title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
     );
   }
 
-  // Input Field Widget
-  Widget _buildInputField({
-    required String hint,
-    int maxLines = 1,
-    IconData? prefixIcon,
-  }) {
+  // Input field helper
+  Widget _buildInputField({required TextEditingController controller, required String hint, int maxLines = 1, IconData? prefixIcon}) {
     return TextField(
+      controller: controller,
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
@@ -154,12 +142,47 @@ class _PostPageState extends State<PostPage> {
         fillColor: Colors.grey.shade100,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.grey) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       ),
     );
+  }
+
+  // Open MapSelectPage to pick location
+  Future<void> _chooseLocation() async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(builder: (_) => const MapSelectPage()),
+    );
+    if (result != null) {
+      setState(() {
+        _selectedLatLng = result;
+        _locationController.text = "${result.latitude.toStringAsFixed(6)}, ${result.longitude.toStringAsFixed(6)}";
+      });
+    }
+  }
+
+  // Build payload for backend
+  Map<String, dynamic> _buildPayload() {
+    return {
+      "type": _selectedPostType == PostType.lost ? "lost" : "found",
+      "heading": _headingController.text,
+      "description": _descriptionController.text,
+      "tags": _tagsController.text,
+      "reward": _rewardController.text,
+      "anonymous": _isAnonymous,
+      "location": _selectedLatLng != null
+          ? {"lat": _selectedLatLng!.latitude, "lng": _selectedLatLng!.longitude}
+          : null,
+      "images": _images.map((e) => e.path).toList(), // you can later send as multipart
+    };
+  }
+
+  // Submit post
+  void _submitPost() {
+    final payload = _buildPayload();
+    print("Payload ready to send to backend: $payload");
+
+    // TODO: Implement your API call here
   }
 
   @override
@@ -178,204 +201,151 @@ class _PostPageState extends State<PostPage> {
             icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () => Navigator.pop(context),
           ),
-          title: const Text(
-            'Create Post',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-          ),
+          title: const Text('Create Post', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
           centerTitle: false,
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: TextButton(
-                onPressed: () {
-                  print('Post button tapped. Type: $_selectedPostType, Anonymous: $_isAnonymous');
-                },
-                child: const Text(
-                  'Post',
-                  style: TextStyle(color: Colors.blue, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                onPressed: _submitPost,
+                child: const Text('Post', style: TextStyle(color: Colors.blue, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
-
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Lost / Found Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: PostTypeButton(
-                      text: 'Lost',
-                      type: PostType.lost,
-                      selectedType: _selectedPostType,
-                      onTap: () => setState(() => _selectedPostType = PostType.lost),
-                    ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(
+              children: [
+                Expanded(
+                  child: PostTypeButton(
+                    text: 'Lost',
+                    type: PostType.lost,
+                    selectedType: _selectedPostType,
+                    onTap: () => setState(() => _selectedPostType = PostType.lost),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: PostTypeButton(
-                      text: 'Found',
-                      type: PostType.found,
-                      selectedType: _selectedPostType,
-                      onTap: () => setState(() => _selectedPostType = PostType.found),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PostTypeButton(
+                    text: 'Found',
+                    type: PostType.found,
+                    selectedType: _selectedPostType,
+                    onTap: () => setState(() => _selectedPostType = PostType.found),
                   ),
-                ],
+                ),
+              ],
+            ),
+
+            _buildSectionTitle('Post Heading'),
+            _buildInputField(controller: _headingController, hint: 'e.g., Cat Lost near Lake Street'),
+
+            _buildSectionTitle('Post Description'),
+            _buildInputField(controller: _descriptionController, hint: 'Share details about your lost/found item...', maxLines: 5),
+
+            _buildSectionTitle('Upload Image'),
+            GestureDetector(
+              onTap: _showImageSourceSheet,
+              child: Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cloud_upload_outlined, color: Colors.grey, size: 30),
+                    Text('Tap to upload image', style: TextStyle(color: Colors.grey)),
+                    Text('Max 5MB', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
               ),
-
-              // Heading
-              _buildSectionTitle('Post Heading'),
-              _buildInputField(hint: 'e.g., Cat Lost near Lake Street'),
-
-              // Description
-              _buildSectionTitle('Post Description'),
-              _buildInputField(
-                hint: 'Share details about your lost/found item...',
-                maxLines: 5,
-              ),
-
-              // Upload Image Section
-              _buildSectionTitle('Upload Image'),
-              GestureDetector(
-                onTap: _showImageSourceSheet,
-                child: Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300, width: 2),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            ),
+            const SizedBox(height: 12),
+            if (_images.isNotEmpty)
+              SizedBox(
+                height: 100,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _images.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) => Stack(
                     children: [
-                      Icon(Icons.cloud_upload_outlined, color: Colors.grey, size: 30),
-                      Text('Tap to upload image', style: TextStyle(color: Colors.grey)),
-                      Text('Max 5MB', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(File(_images[i].path), width: 100, height: 100, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _images.removeAt(i)),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      )
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 12),
-
-              // Preview of selected images
-              if (_images.isNotEmpty)
-                SizedBox(
-                  height: 100,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _images.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (_, i) {
-                      return Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(_images[i].path),
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() => _images.removeAt(i));
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.close, color: Colors.white, size: 16),
-                              ),
-                            ),
-                          )
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-              // Location
-              _buildSectionTitle('Location'),
-              _buildInputField(hint: 'Central Park, New York'),
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    print('Choose on Map tapped');
-                  },
-                  icon: const Icon(Icons.location_on_outlined, size: 20),
-                  label: const Text('Choose on Map'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    side: BorderSide(color: Colors.blue.shade700),
-                    foregroundColor: Colors.blue.shade700,
-                  ),
+            _buildSectionTitle('Location'),
+            _buildInputField(controller: _locationController, hint: 'Select location on map'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _chooseLocation,
+                icon: const Icon(Icons.location_on_outlined, size: 20),
+                label: const Text('Choose on Map'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: BorderSide(color: Colors.blue.shade700),
+                  foregroundColor: Colors.blue.shade700,
                 ),
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Pinpoint the exact location for better visibility.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+            ),
 
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Pinpoint the exact location for better visibility.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+            _buildSectionTitle('Tags'),
+            _buildInputField(controller: _tagsController, hint: 'e.g., #petrescue, #lostcat, #dogwalker'),
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Add relevant tags to help others find your post.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+            ),
+
+            _buildSectionTitle('Reward to Finder'),
+            _buildInputField(controller: _rewardController, hint: 'e.g., 500', prefixIcon: Icons.currency_rupee),
+
+            _buildSectionTitle('Post Anonymously'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Post Anonymously', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                Switch(
+                  value: _isAnonymous,
+                  onChanged: (value) => setState(() => _isAnonymous = value),
+                  activeColor: Colors.blue,
                 ),
-              ),
+              ],
+            ),
 
-              // Tags
-              _buildSectionTitle('Tags'),
-              _buildInputField(hint: 'e.g., #petrescue, #lostcat, #dogwalker'),
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Add relevant tags to help others find your post.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ),
-
-              // Reward
-              _buildSectionTitle('Reward to Finder'),
-              _buildInputField(hint: 'e.g., 500', prefixIcon: Icons.currency_rupee),
-
-              // Anonymous Switch
-              _buildSectionTitle('Post Anonymously'),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Post Anonymously',
-                    style: TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  Switch(
-                    value: _isAnonymous,
-                    onChanged: (value) => setState(() => _isAnonymous = value),
-                    activeColor: Colors.blue,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-            ],
-          ),
+            const SizedBox(height: 30),
+          ]),
         ),
-
         bottomNavigationBar: const BottomNav(currentIndex: 2),
       ),
     );
