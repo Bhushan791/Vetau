@@ -57,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       // Call logout API with authorization header
       final response = await http.post(
-        Uri.parse('$apiBaseUrl/logout/'),
+        Uri.parse('$apiBaseUrl/users/logout/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',

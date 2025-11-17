@@ -23,7 +23,6 @@ void main() async {
 
   // 🔥 Initialize deep-link listener BEFORE running app
   await AuthLinkHandler.init(() {
-    // This callback runs when Google OAuth login succeeds
     navigatorKey.currentState?.pushNamedAndRemoveUntil(
       '/home',
       (route) => false,
@@ -40,8 +39,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,           // <-- Required for deep-link navigation
-      initialRoute: '/',
+      navigatorKey: navigatorKey,
+      initialRoute: '/home',
+
+      // STATIC ROUTES
       routes: {
         '/': (context) => const StartPage(),
         '/login': (context) => const LoginPage(),
@@ -51,9 +52,25 @@ class MyApp extends StatelessWidget {
         '/chats': (context) => const ChatsPage(),
         '/more': (context) => const MorePage(),
         '/post': (context) => const PostPage(),
-        '/detailHome': (context) => const DetailHome(),
         '/profile': (context) => const ProfilePage(),
-        '/forgotPassword': (context) => const ForgotPage(),
+        '/forgotPassword': (context) => const ForgotPassword(),
+      },
+
+      // 🚀 DYNAMIC ROUTES (for postId)
+      onGenerateRoute: (settings) {
+        // For opening detail page with postId
+        if (settings.name == '/detailHome') {
+          final String postId = settings.arguments as String;
+
+          return MaterialPageRoute(
+            builder: (_) => DetailHome(postId: postId),
+          );
+        }
+
+        // default fallback route
+        return MaterialPageRoute(
+          builder: (_) => const HomePage(),
+        );
       },
     );
   }

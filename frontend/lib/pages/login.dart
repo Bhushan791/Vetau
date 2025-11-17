@@ -120,6 +120,11 @@ class _LoginPageState extends State<LoginPage> {
       _isPasswordObscured = !_isPasswordObscured;
     });
   }
+  
+  // New function for the forgot password button
+  void _forgotPasswordPressed() {
+    Navigator.pushNamed(context, '/forgotPassword');
+  }
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -153,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('$apiBaseUrl/login/'),
+        Uri.parse('$apiBaseUrl/users/login/'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -177,37 +182,41 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('userName', responseData['data']['user']['fullName']);
         await prefs.setString('userEmail', responseData['data']['user']['email']);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Navigate to home page
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to home page
           Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
         }
       } else {
         final errorData = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorData['message'] ?? 'Login failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorData['message'] ?? 'Login failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -285,7 +294,26 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _passwordController,
                       validator: _validatePassword,
                     ),
-                    const SizedBox(height: 30),
+                    
+                    // Forgot Password Button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _forgotPasswordPressed, // Calls the placeholder function
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                        ),
+                        child: Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: primaryBlue,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10), // Reduced spacing before the login button
 
                     SizedBox(
                       height: 50,

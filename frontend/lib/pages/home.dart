@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/pages/detail_home.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/components/homeAppBar.dart';
@@ -26,14 +27,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchPosts() async {
-    final url = Uri.parse("https://dummyjson.com/c/98ef-4ef0-45b1-9117");
+    final url = Uri.parse("${ApiConstants.baseUrl}/posts");
 
     try {
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final parsed = jsonDecode(response.body);
+
         setState(() {
-          posts = data;
+          posts = parsed["data"]["posts"]; // ✅ Correct extraction
           isLoading = false;
         });
       } else {
@@ -41,9 +44,7 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       print("Error: $e");
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -60,9 +61,7 @@ class _HomePageState extends State<HomePage> {
           preferredSize: const Size.fromHeight(200),
           child: HomeAppBar(
             rewardPoints: 120.76,
-            onNotificationTap: () {
-              print("Notification tapped");
-            },
+            onNotificationTap: () {},
             onProfileTap: () {
               Navigator.pushNamed(context, '/profile');
             },
@@ -70,56 +69,59 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Consumer(
           builder: (context, ref, child) {
-            final selected = ref.watch(filterStoreProvider);
+            final selectedFilters = ref.watch(filterStoreProvider);
 
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🧩 Filter Component
+                  // Filter Component
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: FilterComponent(),
                   ),
 
-                  // 🧠 Display selected filters
+                  // Display Selected Filters
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      selected.isEmpty
+                      selectedFilters.isEmpty
                           ? "No filters selected"
-                          : "You selected: ${selected.join(', ')}",
+                          : "You selected: ${selectedFilters.join(', ')}",
                       style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500),
+                        fontSize: 16,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // 📝 Posts List
+                  // Posts List
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : ListView.builder(
+                            itemCount: posts.length,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: posts.length,
                             itemBuilder: (context, index) {
-                              final post = posts[index];
                               return GestureDetector(
-                                  onTap: () {
-                                    Navigator.pushNamed(
-                                        context, '/detailHome',
-                                        arguments: post);
-                                  },
-                                child: PostCard(post: post));
+                                onTap: () {
+                                  Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DetailHome(postId: posts[index]["postId"]),
+                                  ),
+                                );
+                                },
+                                child: PostCard(post: posts[index]),
+                              );
                             },
                           ),
-                  ),
+                  )
                 ],
               ),
             );
@@ -131,114 +133,90 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// 💬 Post Card Widget
+
+
+// ---------------------------------------------------------------
+//                     POST CARD WIDGET
+// ---------------------------------------------------------------
+
 class PostCard extends StatelessWidget {
   final Map post;
   const PostCard({super.key, required this.post});
 
-  // Helper to build image from either URL or base64
-  Widget _buildImage(String? imageData) {
-    if (imageData == null || imageData.isEmpty) {
+  // Build image from URL
+  Widget _buildImage() {
+    final List images = post["images"] ?? [];
+
+    if (images.isEmpty) {
       return Container(
         height: 200,
-        width: double.infinity,
         color: Colors.grey[300],
         child: const Center(
-          child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+          child: Icon(Icons.image_not_supported, size: 40),
         ),
       );
     }
 
-    // Check if it's a base64 data URI
-    if (imageData.startsWith('data:image')) {
-      try {
-        final base64String = imageData.split(',')[1];
-        final bytes = base64Decode(base64String);
-        return Image.memory(
-          bytes,
-          height: 200,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              height: 200,
-              color: Colors.grey[300],
-              child: const Center(child: Icon(Icons.broken_image)),
-            );
-          },
-        );
-      } catch (e) {
-        print('Error decoding base64 image: $e');
-        return Container(
-          height: 200,
-          color: Colors.grey[300],
-          child: const Center(child: Icon(Icons.broken_image)),
-        );
-      }
-    }
-
-    // Regular network image
     return Image.network(
-      imageData,
+      images[0],
       height: 200,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          height: 200,
-          color: Colors.grey[300],
-          child: const Center(child: Icon(Icons.broken_image)),
-        );
-      },
+      errorBuilder: (_, __, ___) => Container(
+        height: 200,
+        color: Colors.grey[300],
+        child: const Center(child: Icon(Icons.broken_image)),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Helper function to safely parse reward
-    double getReward() {
-      if (post['reward'] == null) return 0;
-      if (post['reward'] is num) return post['reward'].toDouble();
-      if (post['reward'] is String) {
-        return double.tryParse(post['reward']) ?? 0;
-      }
-      return 0;
-    }
+    final user = post["userId"];
+    final String userName =
+        (post["isAnonymous"] == true) ? "Anonymous" : (user?["fullName"] ?? "Unknown");
 
-    final reward = getReward();
+    final reward = post["rewardAmount"] ?? 0;
 
     return Card(
       elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image
+          // Image Section
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: _buildImage(post['imageUrl']),
+            child: _buildImage(),
           ),
 
-          // Text info
+          // Info Section
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Item Name
                 Text(
-                  post['title'] ?? 'Untitled Post',
+                  post["itemName"] ?? "Unnamed Item",
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 6),
+
+                // Description
                 Text(
-                  post['description'] ?? '',
+                  post["description"] ?? "",
                   style: const TextStyle(color: Colors.black54),
                 ),
+
                 const SizedBox(height: 8),
+
+                // Reward
                 if (reward > 0)
                   Container(
                     padding:
@@ -248,23 +226,30 @@ class PostCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      "Reward: Rs. ${reward.toStringAsFixed(0)}",
+                      "Reward: Rs. $reward",
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                const SizedBox(height: 8),
+
+                const SizedBox(height: 10),
+
+                // Location + User
                 Row(
                   children: [
                     const Icon(Icons.location_on_outlined, size: 16),
                     const SizedBox(width: 4),
-                    Text(post['location'] ?? 'Unknown'),
+                    Text(post["location"] ?? "Unknown"),
+
                     const Spacer(),
+
                     Text(
-                      post['postedBy'] ?? 'Anonymous',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      userName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
