@@ -147,35 +147,42 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-  // Open MapSelectPage to pick location
-  Future<void> _chooseLocation() async {
-    final result = await Navigator.push<LatLng>(
-      context,
-      MaterialPageRoute(builder: (_) => const MapSelectPage()),
-    );
-    if (result != null) {
-      setState(() {
-        _selectedLatLng = result;
-        _locationController.text = "${result.latitude.toStringAsFixed(6)}, ${result.longitude.toStringAsFixed(6)}";
-      });
+    // Open MapSelectPage to pick location
+    Future<void> _chooseLocation() async {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MapSelectPage()),
+      );
+
+      if (result != null) {
+        setState(() {
+          _selectedLatLng = LatLng(result["lat"], result["lng"]);
+          _locationController.text = result["placeName"]; // Show readable name
+        });
+      }
     }
-  }
+
 
   // Build payload for backend
   Map<String, dynamic> _buildPayload() {
     return {
       "type": _selectedPostType == PostType.lost ? "lost" : "found",
-      "heading": _headingController.text,
-      "description": _descriptionController.text,
-      "tags": _tagsController.text,
-      "reward": _rewardController.text,
+      "heading": _headingController.text.trim(),
+      "description": _descriptionController.text.trim(),
+      "tags": _tagsController.text.trim(),
+      "reward": _rewardController.text.trim(),
       "anonymous": _isAnonymous,
       "location": _selectedLatLng != null
-          ? {"lat": _selectedLatLng!.latitude, "lng": _selectedLatLng!.longitude}
+          ? {
+              "lat": _selectedLatLng!.latitude,
+              "lng": _selectedLatLng!.longitude,
+              "text": _locationController.text.trim(), // <-- for backend display/search
+            }
           : null,
-      "images": _images.map((e) => e.path).toList(), // you can later send as multipart
+      "images": _images.map((e) => e.path).toList(),
     };
   }
+
 
   // Submit post
   void _submitPost() {
