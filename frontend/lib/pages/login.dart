@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -250,14 +251,13 @@ class _LoginPageState extends State<LoginPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.widgets, color: primaryBlue, size: 40),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Lost and Found',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                        // Icon(Icons.widgets, color: primaryBlue, size: 40),
+                        // const SizedBox(width: 8),
+                        Text(
+                          "Vetau",
+                          style: GoogleFonts.kaushanScript(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 35,
                           ),
                         ),
                       ],

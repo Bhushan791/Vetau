@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/pages/editPost.dart';
 import 'package:frontend/stores/like_store.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DetailHome extends ConsumerStatefulWidget {
-  final String postId; // Accept postId
+  final String postId;
+  
 
   const DetailHome({super.key, required this.postId});
 
@@ -17,11 +20,20 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
   Map<String, dynamic>? postData;
   bool isLoading = true;
   bool hasError = false;
+  String? loggedInUserId;
 
   @override
   void initState() {
     super.initState();
+    loadUserId();
     fetchPost();
+  }
+
+  Future<void> loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      loggedInUserId = prefs.getString("userId");
+    });
   }
 
   Future<void> fetchPost() async {
@@ -39,14 +51,14 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         setState(() {
-          postData = decoded['data']; // ✅ real data is inside "data"
+          postData = decoded['data']; 
           isLoading = false;
         });
       } else {
         throw Exception("Failed to load post");
       }
     } catch (e) {
-      print("Fetch error: $e"); // useful for debugging
+      print("Fetch error: $e");
       setState(() {
         hasError = true;
         isLoading = false;
@@ -54,9 +66,30 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     }
   }
 
+  Future<void> deletePost() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    final response = await http.delete(
+      Uri.parse("https://vetau.onrender.com/api/v1/posts/${widget.postId}"),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      if (mounted) Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to delete post: ${response.body}")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final likeState = ref.watch(likesProvider);
+    ref.watch(likesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Post Details")),
@@ -82,92 +115,131 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
 
   Widget buildPostContent() {
     final post = postData!;
-
     final comments = post["comments"] ?? [];
     final user = post["userId"] ?? {};
+    final type = (post["type"] ?? "").toString().toLowerCase();
+
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ---------------- Author Info ----------------
+          // ---------------- PROFILE ROW ----------------
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
                 backgroundImage: NetworkImage(user["profileImage"] ?? ""),
                 radius: 24,
               ),
+
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user["fullName"] ?? "Unknown",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  Text(post["createdAt"] != null
-                      ? DateTime.tryParse(post["createdAt"])?.toLocal().toString().split('.')[0] ?? ""
-                      : ""),
-                ],
-              ),
-              const Spacer(),
 
-              // Reward
-              if (post["rewardAmount"] != null && post["rewardAmount"] > 0)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFD8B02),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    "₹${post["rewardAmount"]}",
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // NAME
+                    Text(
+                      user["fullName"] ?? "Unknown",
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                  ),
+
+                    // DATE
+                    Text(
+                      post["createdAt"] != null
+                          ? DateTime.tryParse(post["createdAt"])
+                                  ?.toLocal()
+                                  .toString()
+                                  .split('.')[0] ??
+                              ""
+                          : "",
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 12),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // TYPE BADGE (LOST/FOUND)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: type == "lost"
+                            ? Colors.red.shade600
+                            : Colors.blue.shade600,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        type.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // LOCATION (WRAPS IF LONG)
+                    Text(
+                      post["location"] ?? "",
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500),
+                      softWrap: true,
+                    ),
+                  ],
                 ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // ---------------- Category & Location ----------------
-          Row(
-            children: [
-              Chip(
-                label: Text(post["category"] ?? ""),
-                backgroundColor: Colors.blue.shade600,
-                labelStyle: const TextStyle(color: Colors.white),
               ),
-              const SizedBox(width: 8),
-              Chip(label: Text(post["location"] ?? "")),
-              const SizedBox(width: 8),
-              if (post["isAnonymous"] == true)
-                const Chip(label: Text("Anonymous")),
+
+              // 3 DOT MENU (ONLY USER WHO POSTED)
+              if (post["userId"]?["_id"] == loggedInUserId)
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == "edit") {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => Editpost(),
+                        ),
+                      );
+                    } else if (value == "delete") {
+                      deletePost();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: "edit",
+                      child: Text("Edit Post"),
+                    ),
+                    const PopupMenuItem(
+                      value: "delete",
+                      child: Text("Delete Post",
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                )
             ],
           ),
 
           const SizedBox(height: 12),
-
-          // ---------------- Title ----------------
+          // TITLE
           Text(
             post["itemName"] ?? "",
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 8),
 
-          // ---------------- Description ----------------
+          // DESCRIPTION
           Text(post["description"] ?? ""),
 
           const SizedBox(height: 12),
 
-          // ---------------- Images ----------------
+          // IMAGE
           if (post["images"] != null && post["images"].isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -176,7 +248,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
 
           const SizedBox(height: 20),
 
-          // ---------------- Action Buttons ----------------
+          // ACTION BUTTONS
           Row(
             children: [
               IconButton(
@@ -202,10 +274,9 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
             label: const Text(
               "Claim as found",
               style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
@@ -219,10 +290,11 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           const SizedBox(height: 24),
           const Divider(),
 
-          // ---------------- Comments Section ----------------
+          // COMMENTS SECTION
           Text(
             "Comments (${comments.length})",
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 12),
@@ -247,12 +319,11 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Author
           Row(
             children: [
               CircleAvatar(
-                backgroundImage: NetworkImage(
-                    comment["author"]?["profileImage"] ?? ""),
+                backgroundImage:
+                    NetworkImage(comment["author"]?["profileImage"] ?? ""),
               ),
               const SizedBox(width: 10),
               Column(
@@ -262,13 +333,15 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
                     comment["author"]?["fullName"] ?? "Unknown",
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Text(comment["createdAt"] != null
-                      ? DateTime.tryParse(comment["createdAt"])
-                              ?.toLocal()
-                              .toString()
-                              .split('.')[0] ??
-                          ""
-                      : ""),
+                  Text(
+                    comment["createdAt"] != null
+                        ? DateTime.tryParse(comment["createdAt"])
+                                ?.toLocal()
+                                .toString()
+                                .split('.')[0] ??
+                            ""
+                        : "",
+                  ),
                 ],
               ),
             ],
@@ -285,9 +358,10 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
                   likeState.likedComments.contains(index.toString())
                       ? Icons.favorite
                       : Icons.favorite_border,
-                  color: likeState.likedComments.contains(index.toString())
-                      ? Colors.red
-                      : Colors.grey,
+                  color:
+                      likeState.likedComments.contains(index.toString())
+                          ? Colors.red
+                          : Colors.grey,
                   size: 20,
                 ),
                 onPressed: () {

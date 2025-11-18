@@ -7,6 +7,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+// NEW imports required for conversion
+import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
+import 'package:http_parser/http_parser.dart';
 
 enum PostType { lost, found }
 
@@ -150,21 +154,20 @@ class _PostPageState extends State<PostPage> {
     );
   }
 
-    // Open MapSelectPage to pick location
-    Future<void> _chooseLocation() async {
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const MapSelectPage()),
-      );
+  // Open MapSelectPage to pick location
+  Future<void> _chooseLocation() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MapSelectPage()),
+    );
 
-      if (result != null) {
-        setState(() {
-          _selectedLatLng = LatLng(result["lat"], result["lng"]);
-          _locationController.text = result["placeName"]; // Show readable name
-        });
-      }
+    if (result != null) {
+      setState(() {
+        _selectedLatLng = LatLng(result["lat"], result["lng"]);
+        _locationController.text = result["placeName"]; // Show readable name
+      });
     }
-
+  }
 
   // Build payload for backend
   Map<String, dynamic> _buildPayload() {
@@ -186,6 +189,34 @@ class _PostPageState extends State<PostPage> {
     };
   }
 
+  // -------------------------
+  // Helper: Force convert any image file to REAL JPEG bytes and save as .jpg
+  // -------------------------
+  Future<File> _forceConvertToJpg(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+
+      // If decode fails, return the original file (backend may still reject, but we tried)
+      if (decoded == null) {
+        debugPrint("Image decode failed for ${file.path}, using original file.");
+        return file;
+      }
+
+      final jpgBytes = img.encodeJpg(decoded, quality: 85);
+
+      // create new file path with .jpg extension
+      final newPath = file.path.replaceAll(RegExp(r'\.\w+$'), '.jpg');
+
+      final jpgFile = File(newPath);
+      await jpgFile.writeAsBytes(jpgBytes, flush: true);
+      debugPrint("Converted ${file.path} -> $newPath");
+      return jpgFile;
+    } catch (e) {
+      debugPrint("Error converting image to JPG: $e");
+      return file;
+    }
+  }
 
   // Submit post
   void _submitPost() async {
@@ -214,9 +245,26 @@ class _PostPageState extends State<PostPage> {
     request.fields['location'] = _locationController.text.trim();
 
     // Add images
-    for (var img in _images) {
-      final file = await http.MultipartFile.fromPath('images', img.path);
-      request.files.add(file);
+    for (var xfile in _images) {
+      try {
+        final originalFile = File(xfile.path);
+        debugPrint("Original image path: ${originalFile.path}");
+
+        // Convert to a true JPEG file (this re-encodes bytes and ensures valid JPEG signature)
+        final convertedFile = await _forceConvertToJpg(originalFile);
+
+        // Use contentType to explicitly set MIME
+        final multipartFile = await http.MultipartFile.fromPath(
+          'images',
+          convertedFile.path,
+          contentType: MediaType('image', 'jpeg'),
+        );
+
+        request.files.add(multipartFile);
+        debugPrint("Added multipart file: ${convertedFile.path}");
+      } catch (e) {
+        debugPrint("Failed to add image ${xfile.path}: $e");
+      }
     }
 
     // ---------------------------------------
@@ -229,23 +277,29 @@ class _PostPageState extends State<PostPage> {
 
     print("Sending temporary API request...");
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
-    print("Response Status: ${response.statusCode}");
-    print("Response Body: ${response.body}");
+      print("Response Status: ${response.statusCode}");
+      print("Response Body: ${response.body}");
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post created successfully")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to create post")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Request error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Post created successfully")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to create post")),
+        const SnackBar(content: Text("Failed to create post")),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

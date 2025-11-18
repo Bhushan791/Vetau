@@ -8,6 +8,7 @@ import 'package:frontend/components/homeAppBar.dart';
 import 'package:frontend/components/bottomNav.dart';
 import 'package:frontend/components/filter_component.dart';
 import 'package:frontend/stores/filter_store.dart';
+import 'dart:ui' as ui;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -146,7 +147,6 @@ class PostCard extends StatelessWidget {
   // Build image from URL
   Widget _buildImage() {
     final List images = post["images"] ?? [];
-
     if (images.isEmpty) {
       return Container(
         height: 200,
@@ -157,15 +157,68 @@ class PostCard extends StatelessWidget {
       );
     }
 
-    return Image.network(
-      images[0],
-      height: 200,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+    final String rawUrl = images[0]?.toString() ?? "";
+    final bool isNetwork = rawUrl.toLowerCase().startsWith("http");
+
+    if (!isNetwork || rawUrl.trim().isEmpty) {
+      // Not a network image: show placeholder (prevents file:/// errors)
+      return Container(
         height: 200,
         color: Colors.grey[300],
-        child: const Center(child: Icon(Icons.broken_image)),
+        child: const Center(
+          child: Icon(Icons.broken_image, size: 40),
+        ),
+      );
+    }
+
+    // At this point we have a valid network URL. Show reddit-style card:
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image (cover) + dark overlay
+            Image.network(
+              rawUrl,
+              fit: BoxFit.cover,
+              // don't crash app while loading
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(color: Colors.black12);
+              },
+              errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+            ),
+
+            // Blur + darken layer
+            BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 4.0, sigmaY: 4.0),
+              child: Container(
+                color: Colors.black.withOpacity(0.35),
+              ),
+            ),
+
+            // Foreground full image centered (shows full vertical image)
+            Center(
+              child: Image.network(
+                rawUrl,
+                fit: BoxFit.contain,
+                // ensure it doesn't overflow; gives full image view
+                width: double.infinity,
+                height: double.infinity,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const SizedBox.shrink();
+                },
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image, size: 40),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -185,18 +238,69 @@ class PostCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Section
+          // Image (Reddit-style)
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: _buildImage(),
           ),
 
-          // Info Section
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // REWARD + LOST/FOUND ROW
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Reward
+                    if (reward > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFF8C32),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.attach_money_sharp, color: Colors.white, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              "Reward: Rs. $reward",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(width: 30),
+
+                    // LOST / FOUND tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: post["type"] == "lost"
+                            ? Colors.redAccent
+                            : Color(0xFF2196F3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        (post["type"] ?? "").toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
                 // Item Name
                 Text(
                   post["itemName"] ?? "Unnamed Item",
@@ -214,36 +318,24 @@ class PostCard extends StatelessWidget {
                   style: const TextStyle(color: Colors.black54),
                 ),
 
-                const SizedBox(height: 8),
-
-                // Reward
-                if (reward > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.yellow[700],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      "Reward: Rs. $reward",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
                 const SizedBox(height: 10),
 
                 // Location + User
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(Icons.location_on_outlined, size: 16),
                     const SizedBox(width: 4),
-                    Text(post["location"] ?? "Unknown"),
 
-                    const Spacer(),
+                    // Wrapping Location
+                    Expanded(
+                      child: Text(
+                        post["location"] ?? "Unknown",
+                        softWrap: true,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
 
                     Text(
                       userName,
@@ -259,5 +351,6 @@ class PostCard extends StatelessWidget {
         ],
       ),
     );
+
   }
 }
