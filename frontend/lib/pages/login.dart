@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/services/token_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -54,7 +55,9 @@ class LabeledInputField extends StatelessWidget {
           validator: validator,
           keyboardType: isPassword
               ? TextInputType.visiblePassword
-              : (label.contains('Email') ? TextInputType.emailAddress : TextInputType.text),
+              : (label.contains('Email')
+                  ? TextInputType.emailAddress
+                  : TextInputType.text),
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: TextStyle(color: Colors.grey[500]),
@@ -85,7 +88,8 @@ class LabeledInputField extends StatelessWidget {
                     onPressed: onToggleVisibility,
                   )
                 : null,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 10.0),
+            contentPadding: const EdgeInsets.symmetric(
+                vertical: 14.0, horizontal: 10.0),
           ),
         ),
       ],
@@ -109,6 +113,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordObscured = true;
   bool _isLoading = false;
 
+  String? errorMessage; // 🔴 Inline error container message
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -121,103 +127,65 @@ class _LoginPageState extends State<LoginPage> {
       _isPasswordObscured = !_isPasswordObscured;
     });
   }
-  
-  // New function for the forgot password button
-  void _forgotPasswordPressed() {
-    Navigator.pushNamed(context, '/forgotPassword');
-  }
-
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Email is required';
-    }
-    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Please enter a valid email';
-    }
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-    if (value.length < 6) {
-      return 'Password must be at least 6 characters';
-    }
-    return null;
-  }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
+      errorMessage = null;
     });
 
     try {
+      print('🔐 Attempting login...');
+
       final response = await http.post(
         Uri.parse('$apiBaseUrl/users/login/'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailController.text.trim(),
           'password': _passwordController.text,
         }),
       );
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        
-        // Store access token and user data
+        final data = jsonDecode(response.body);
+        final tokenService = TokenService();
+
+        print('✅ Login successful');
+
+        // Save access token using TokenService
+        final accessToken = data['data']['accessToken'];
+        await tokenService.saveAccessToken(accessToken);
+
+        // Save user info in SharedPreferences
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('accessToken', responseData['data']['accessToken']);
-        await prefs.setString('userId', responseData['data']['user']['_id']);
-        await prefs.setString('userName', responseData['data']['user']['fullName']);
-        await prefs.setString('userEmail', responseData['data']['user']['email']);
+        await prefs.setString('userId', data['data']['user']['_id']);
+        await prefs.setString('userName', data['data']['user']['fullName']);
+        await prefs.setString('userEmail', data['data']['user']['email']);
+
+        print('🍪 Refresh token automatically stored in secure cookie');
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login successful'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // Navigate to home page
-          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+              context, '/home', (route) => false);
         }
       } else {
-        final errorData = jsonDecode(response.body);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorData['message'] ?? 'Login failed'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        final error = jsonDecode(response.body);
+        setState(() {
+          errorMessage = error['message'] ?? "Login failed";
+        });
       }
     } catch (e) {
+      print('❌ Login error: $e');
       setState(() {
         _isLoading = false;
+        errorMessage = "Server error. Please try again later.";
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -226,7 +194,8 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
           child: Center(
             child: Container(
               decoration: BoxDecoration(
@@ -248,39 +217,57 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Icon(Icons.widgets, color: primaryBlue, size: 40),
-                        // const SizedBox(width: 8),
-                        Text(
-                          "Vetau",
-                          style: GoogleFonts.kaushanScript(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 35,
-                          ),
+                    Center(
+                      child: Text(
+                        "Vetau",
+                        style: GoogleFonts.kaushanScript(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 35,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-
-                    const Text(
-                      'Welcome Back!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
+
+                    // 🔴 Inline Error Box
+                    if (errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade300,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error, color: Colors.white),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     LabeledInputField(
                       label: 'Email',
                       hintText: 'Enter your email',
                       prefixIcon: Icons.email_outlined,
                       controller: _emailController,
-                      validator: _validateEmail,
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'Email is required';
+                        final emailRegex = RegExp(
+                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                        if (!emailRegex.hasMatch(value))
+                          return 'Enter a valid email';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 20),
 
@@ -292,28 +279,32 @@ class _LoginPageState extends State<LoginPage> {
                       isObscured: _isPasswordObscured,
                       onToggleVisibility: _togglePasswordVisibility,
                       controller: _passwordController,
-                      validator: _validatePassword,
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'Password is required';
+                        if (value.length < 6)
+                          return 'Password must be 6+ characters';
+                        return null;
+                      },
                     ),
-                    
-                    // Forgot Password Button
+                    const SizedBox(height: 10),
+
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: _forgotPasswordPressed, // Calls the placeholder function
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                        ),
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/forgotPassword');
+                        },
                         child: Text(
                           'Forgot Password?',
                           style: TextStyle(
                             color: primaryBlue,
                             fontWeight: FontWeight.w600,
-                            fontSize: 14,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10), // Reduced spacing before the login button
+                    const SizedBox(height: 10),
 
                     SizedBox(
                       height: 50,
@@ -332,7 +323,8 @@ class _LoginPageState extends State<LoginPage> {
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor:
+                                      AlwaysStoppedAnimation(Colors.white),
                                   strokeWidth: 2,
                                 ),
                               )
@@ -362,13 +354,12 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(
                       height: 50,
                       child: OutlinedButton(
-                        onPressed: () {
-                          print('Google Sign In Button Pressed');
-                        },
+                        onPressed: () {},
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
-                          side: BorderSide(color: secondaryGray, width: 1.5),
+                          side: BorderSide(
+                              color: secondaryGray, width: 1.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10.0),
                           ),
@@ -382,7 +373,8 @@ class _LoginPageState extends State<LoginPage> {
                               style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: primaryBlue.withOpacity(0.8)),
+                                  color:
+                                      primaryBlue.withOpacity(0.8)),
                             ),
                             const SizedBox(width: 10),
                             const Text(
@@ -410,7 +402,8 @@ class _LoginPageState extends State<LoginPage> {
                               color: Colors.grey[700],
                             ),
                             children: const [
-                              TextSpan(text: "Don't have an account? "),
+                              TextSpan(
+                                  text: "Don't have an account? "),
                               TextSpan(
                                 text: 'Sign Up',
                                 style: TextStyle(
