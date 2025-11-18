@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/config/google_oauth_service.dart';
+import 'package:frontend/pages/login.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 const Color primaryBlue = Color(0xFF4285F4);
 const Color secondaryGray = Color(0xFFE0E0E0);
-const double cardPadding = 24.0;
+const double cardPadding = 26.0;
 const String apiBaseUrl = ApiConstants.baseUrl;
 
 // ---------------------------
-// Labeled Input Field
+// REUSABLE INPUT FIELD
 // ---------------------------
 class LabeledInputField extends StatelessWidget {
   final String label;
@@ -45,7 +45,7 @@ class LabeledInputField extends StatelessWidget {
           label,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 14,
+            fontSize: 15,
             color: Colors.black87,
           ),
         ),
@@ -56,38 +56,44 @@ class LabeledInputField extends StatelessWidget {
           validator: validator,
           keyboardType: isPassword
               ? TextInputType.visiblePassword
-              : (label == 'Email' ? TextInputType.emailAddress : TextInputType.text),
+              : (label == 'Email'
+                  ? TextInputType.emailAddress
+                  : TextInputType.text),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(color: Colors.grey[500]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-              borderSide: BorderSide(color: secondaryGray, width: 1.0),
+            hintStyle: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-              borderSide: const BorderSide(color: primaryBlue, width: 1.5),
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: secondaryGray, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-              borderSide: BorderSide(color: secondaryGray, width: 1.0),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
             ),
-            prefixIcon: Icon(
-              prefixIcon,
-              color: Colors.grey[500],
-              size: 20,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: primaryBlue, width: 1.6),
             ),
+            prefixIcon: Icon(prefixIcon, size: 21, color: Colors.grey[600]),
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
                       isObscured ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.grey,
+                      color: Colors.grey[600],
                       size: 20,
                     ),
                     onPressed: onToggleVisibility,
                   )
                 : null,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 10.0),
+            contentPadding: const EdgeInsets.symmetric(
+                vertical: 16, horizontal: 12),
           ),
         ),
       ],
@@ -96,7 +102,7 @@ class LabeledInputField extends StatelessWidget {
 }
 
 // ---------------------------
-// Register Page
+// REGISTER PAGE
 // ---------------------------
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -126,9 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  // ---------------------------
   // VALIDATIONS
-  // ---------------------------
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return 'Email is required';
     final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
@@ -149,250 +153,249 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // ---------------------------
-  // SHARED PREFERENCES SAVE
-  // ---------------------------
-  Future<void> _saveUserData({
-    required String token,
-    required String fullName,
-    required String email,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('token', token);
-    await prefs.setString('fullName', fullName);
-    await prefs.setString('email', email);
-  }
-
-  // ---------------------------
   // REGISTER API CALL
   // ---------------------------
-  Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> registerUser() async {
+    var request = http.MultipartRequest("POST", Uri.parse('$apiBaseUrl/users/register/'),);
 
-    setState(() => _isLoading = true);
+    request.fields["fullName"] = _nameController.text.trim();
+    request.fields["email"] = _emailController.text.trim();
+    request.fields["password"] = _passwordController.text.trim();
+    request.fields["authType"] = "normal";
+
+    print("Sending fields: ${request.fields}");
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/users/register/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'fullName': _nameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text,
-          'authType': 'normal',
-        }),
-      );
+      var response = await request.send();
+      String body = await response.stream.bytesToString();
 
-      setState(() => _isLoading = false);
+      print("STATUS: ${response.statusCode}");
+      print("BODY: $body");
 
-      final data = jsonDecode(response.body);
-
-      print('STATUS: ${response.statusCode}');
-      print('BODY: $data');
-
-      if (response.statusCode == 201) {
-        // Save token and user info
-        await _saveUserData(
-          token: data['accessToken'],
-          fullName: data['user']['fullName'],
-          email: data['user']['email'],
-        );
-
+      if (response.statusCode == 201 || response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Registration Successful!")),
         );
 
-        // Clear form
-        _nameController.clear();
-        _emailController.clear();
-        _passwordController.clear();
-        _confirmPasswordController.clear();
-
-        // Navigate to home after delay
-        Future.delayed(const Duration(seconds: 2), () {
-          Navigator.pushReplacementNamed(context, '/home');
-        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => LoginPage()),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? 'Registration failed'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text("Registration failed: $body")),
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      print("Exception: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text("Something went wrong: $e")),
       );
     }
   }
 
   // ---------------------------
-  // BUILD UI
+  // BUTTON HANDLER
+  // ---------------------------
+  void _register() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+
+      await registerUser();
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // ---------------------------
+  // UI
   // ---------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 34),
           child: Center(
             child: Container(
+              padding: const EdgeInsets.all(cardPadding),
+              constraints: const BoxConstraints(maxWidth: 460),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20.0),
+                borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 5,
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(cardPadding),
-              constraints: const BoxConstraints(maxWidth: 450),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     const Text(
-                      'Create an account',
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                      "Create Your Account",
+                      style: TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 26),
 
-                    // Name
                     LabeledInputField(
-                      label: 'Name',
-                      hintText: 'Enter your full name',
+                      label: "Full Name",
+                      hintText: "Enter your full name",
                       prefixIcon: Icons.person_outline,
                       controller: _nameController,
-                      validator: (value) => value!.isEmpty ? 'Name is required' : null,
+                      validator: (v) =>
+                          v!.isEmpty ? "Name is required" : null,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
 
-                    // Email
                     LabeledInputField(
-                      label: 'Email',
-                      hintText: 'example@vetau.com',
+                      label: "Email Address",
+                      hintText: "example@mail.com",
                       prefixIcon: Icons.email_outlined,
                       controller: _emailController,
                       validator: _validateEmail,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
 
-                    // Password
                     LabeledInputField(
-                      label: 'Password',
-                      hintText: '*********',
+                      label: "Password",
+                      hintText: "Enter password",
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isObscured: _isPasswordObscured,
                       onToggleVisibility: () {
-                        setState(() => _isPasswordObscured = !_isPasswordObscured);
+                        setState(() =>
+                            _isPasswordObscured = !_isPasswordObscured);
                       },
                       controller: _passwordController,
                       validator: _validatePassword,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
 
-                    // Confirm Password
                     LabeledInputField(
-                      label: 'Confirm Password',
-                      hintText: '*********',
+                      label: "Confirm Password",
+                      hintText: "Re-enter password",
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isObscured: _isConfirmPasswordObscured,
                       onToggleVisibility: () {
-                        setState(() => _isConfirmPasswordObscured = !_isConfirmPasswordObscured);
+                        setState(() =>
+                            _isConfirmPasswordObscured = !_isConfirmPasswordObscured);
                       },
                       controller: _confirmPasswordController,
                       validator: _validateConfirmPassword,
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 32),
 
                     // Register Button
                     SizedBox(
-                      height: 50,
+                      width: double.infinity,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _register,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryBlue,
-                          disabledBackgroundColor: Colors.grey[300],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 2,
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 strokeWidth: 2,
-                              )
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white))
                             : const Text(
-                                'Register',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                "Register",
+                                style: TextStyle(
+                                    fontSize: 17, fontWeight: FontWeight.w700),
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    const Center(
+                      child: Text(
+                        "or",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    const Center(child: Text('or', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500))),
-                    const SizedBox(height: 20),
-
-                    // Google Button (UI only, backend integration can be added later)
-                    // Google Sign Up Button
+                    // Google Signup
                     SizedBox(
-                      height: 50,
+                      width: double.infinity,
+                      height: 52,
                       child: OutlinedButton(
                         onPressed: () {
-                          GoogleOAuthService.openGoogleLogin(context); // 🚀 Start Google Auth
+                          GoogleOAuthService.openGoogleLogin(context);
                         },
                         style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300, width: 1.4),
                           backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          side: BorderSide(color: secondaryGray, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'G',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primaryBlue.withOpacity(0.8)),
+                              "G",
+                              style: TextStyle(
+                                color: primaryBlue,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             const Text(
-                              'Sign Up with Google',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              "Sign Up with Google",
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
 
-                    // Login link
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/login');
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => LoginPage()),
+                          );
                         },
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                            children: const [
-                              TextSpan(text: 'Already have an account? '),
-                              TextSpan(text: 'Login', style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
-                            ],
+                        child: const Text(
+                          "Already have an account? Login",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: primaryBlue,
+                            fontSize: 14.5,
                           ),
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 10),
                   ],
                 ),
               ),
