@@ -122,6 +122,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
   bool _isLoading = false;
+  String? errorMessage;
 
   @override
   void dispose() {
@@ -156,41 +157,69 @@ class _RegisterPageState extends State<RegisterPage> {
   // REGISTER API CALL
   // ---------------------------
   Future<void> registerUser() async {
-    var request = http.MultipartRequest("POST", Uri.parse('$apiBaseUrl/users/register/'),);
+    setState(() {
+      errorMessage = null;
+    });
+
+    var request = http.MultipartRequest(
+      "POST",
+      Uri.parse('$apiBaseUrl/users/register/'),
+    );
 
     request.fields["fullName"] = _nameController.text.trim();
     request.fields["email"] = _emailController.text.trim();
     request.fields["password"] = _passwordController.text.trim();
     request.fields["authType"] = "normal";
 
+    print("🔐 Sending registration request...");
     print("Sending fields: ${request.fields}");
 
     try {
       var response = await request.send();
       String body = await response.stream.bytesToString();
 
-      print("STATUS: ${response.statusCode}");
-      print("BODY: $body");
+      print("📡 STATUS: ${response.statusCode}");
+      print("📦 BODY: $body");
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Registration Successful!")),
-        );
+        print("✅ Registration successful!");
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("✅ Registration Successful!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Registration failed: $body")),
-        );
+        // Parse error response
+        try {
+          final errorData = jsonDecode(body);
+          final errorMsg = errorData['message'] ?? 'Registration failed';
+          
+          setState(() {
+            errorMessage = errorMsg;
+          });
+
+          print("❌ Registration error: $errorMsg");
+        } catch (e) {
+          setState(() {
+            errorMessage = 'Registration failed: $body';
+          });
+          print("❌ Could not parse error: $e");
+        }
       }
     } catch (e) {
-      print("Exception: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Something went wrong: $e")),
-      );
+      print("❌ Exception: $e");
+      setState(() {
+        errorMessage = "Server error. Please try again later.";
+      });
     }
   }
 
@@ -248,6 +277,34 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                     const SizedBox(height: 26),
+
+                    // 🔴 Error Message Box
+                    if (errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade300,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error, color: Colors.white),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     LabeledInputField(
                       label: "Full Name",
@@ -346,7 +403,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           GoogleOAuthService.openGoogleLogin(context);
                         },
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey.shade300, width: 1.4),
+                          side: BorderSide(
+                              color: Colors.grey.shade300, width: 1.4),
                           backgroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -381,7 +439,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (_) => LoginPage()),
+                            MaterialPageRoute(
+                                builder: (_) => const LoginPage()),
                           );
                         },
                         child: const Text(
