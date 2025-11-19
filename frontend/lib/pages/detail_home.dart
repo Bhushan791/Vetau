@@ -5,6 +5,7 @@ import 'package:frontend/stores/like_store.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui' as ui;
 
 class DetailHome extends ConsumerStatefulWidget {
   final String postId;
@@ -130,7 +131,14 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                backgroundImage: NetworkImage(user["profileImage"] ?? ""),
+                backgroundImage: user["profileImage"] != null &&
+                    user["profileImage"].toString().startsWith("http")
+                  ? NetworkImage(user["profileImage"])
+                  : null,
+                child: user["profileImage"] == null ||
+                    !user["profileImage"].toString().startsWith("http")
+                  ? const Icon(Icons.person)
+                  : null,
                 radius: 24,
               ),
 
@@ -239,12 +247,9 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
 
           const SizedBox(height: 12),
 
-          // IMAGE
+          // IMAGES
           if (post["images"] != null && post["images"].isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(post["images"][0]),
-            ),
+            _buildImageSection(post["images"]),
 
           const SizedBox(height: 20),
 
@@ -306,6 +311,83 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     );
   }
 
+  Widget _buildImageSection(List images) {
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: images.length == 1 ? 1 : 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: images.length,
+      itemBuilder: (context, index) {
+        return GestureDetector(
+          onTap: () => _showFullScreenImage(images, index),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: _buildNetworkImage(images[index], double.infinity, double.infinity, BoxFit.cover),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFullScreenImage(List images, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FullScreenImageViewer(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNetworkImage(String imageUrl, double width, double height, BoxFit fit) {
+    final String rawUrl = imageUrl.toString();
+    final bool isNetwork = rawUrl.toLowerCase().startsWith("http");
+
+    if (!isNetwork || rawUrl.trim().isEmpty) {
+      return Container(
+        width: width,
+        height: height,
+        color: Colors.grey[300],
+        child: const Center(
+          child: Icon(Icons.broken_image, size: 40),
+        ),
+      );
+    }
+
+    return Image.network(
+      rawUrl,
+      width: width,
+      height: height,
+      fit: fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          width: width,
+          height: height,
+          color: Colors.black12,
+          child: const Center(child: CircularProgressIndicator()),
+        );
+      },
+      errorBuilder: (_, __, ___) => Container(
+        width: width,
+        height: height,
+        color: Colors.grey[300],
+        child: const Center(
+          child: Icon(Icons.broken_image, size: 40),
+        ),
+      ),
+    );
+  }
+
   Widget buildComment(int index, dynamic comment) {
     final likeState = ref.watch(likesProvider);
 
@@ -322,8 +404,14 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           Row(
             children: [
               CircleAvatar(
-                backgroundImage:
-                    NetworkImage(comment["author"]?["profileImage"] ?? ""),
+                backgroundImage: comment["author"]?["profileImage"] != null &&
+                    comment["author"]["profileImage"].toString().startsWith("http")
+                  ? NetworkImage(comment["author"]["profileImage"])
+                  : null,
+                child: comment["author"]?["profileImage"] == null ||
+                    !comment["author"]["profileImage"].toString().startsWith("http")
+                  ? const Icon(Icons.person)
+                  : null,
               ),
               const SizedBox(width: 10),
               Column(
@@ -379,5 +467,72 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
         ],
       ),
     );
+  }
+}
+
+class FullScreenImageViewer extends StatefulWidget {
+  final List images;
+  final int initialIndex;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          '${_currentIndex + 1} / ${widget.images.length}',
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        itemCount: widget.images.length,
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            child: Center(
+              child: Image.network(
+                widget.images[index],
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image,
+                  color: Colors.white,
+                  size: 100,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 }
