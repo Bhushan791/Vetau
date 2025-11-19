@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/pages/resetPassword.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:frontend/config/api_constants.dart';
@@ -14,11 +15,24 @@ class OTPVerificationPage extends StatefulWidget {
 
 class _OTPVerificationPageState extends State<OTPVerificationPage> {
   List<TextEditingController> otpControllers =
-      List.generate(5, (_) => TextEditingController());
+      List.generate(6, (_) => TextEditingController());
+  List<FocusNode> focusNodes = List.generate(6, (_) => FocusNode());
 
   bool isLoading = false;
   String statusMessage = "";
   Color statusColor = Colors.red;
+
+  @override
+  void dispose() {
+    // Dispose all controllers and focus nodes
+    for (var controller in otpControllers) {
+      controller.dispose();
+    }
+    for (var node in focusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
 
   // Email masking
   String maskEmail(String email) {
@@ -30,9 +44,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   Future<void> verifyOtp() async {
     String otp = otpControllers.map((c) => c.text).join();
 
-    if (otp.length != 5) {
+    if (otp.length != 6) {
       setState(() {
-        statusMessage = "Please enter the 5-digit OTP";
+        statusMessage = "Please enter the 6-digit OTP";
         statusColor = Colors.red;
       });
       return;
@@ -58,9 +72,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
           statusColor = Colors.green;
         });
 
-        // TODO: Navigate to Set New Password Page
-        // Navigator.push(context, MaterialPageRoute(builder: (_) => NewPasswordPage(email: widget.email)));
-
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ResetPasswordPage(email: widget.email),
+          ),
+        );
       } else {
         final error = jsonDecode(response.body);
         setState(() {
@@ -107,26 +124,29 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             const SizedBox(height: 10),
 
             Text(
-              "We sent a reset link to ${maskEmail(widget.email)}\nenter 5 digit code mentioned in the email",
+              "We sent a reset link to ${maskEmail(widget.email)}\nenter 6 digit code mentioned in the email",
               style: const TextStyle(fontSize: 15, color: Colors.black54),
             ),
 
             const SizedBox(height: 25),
 
-            // OTP 5 Boxes
+            // OTP 6 Boxes
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(5, (index) {
+              children: List.generate(6, (index) {
                 return SizedBox(
                   width: 55,
                   height: 60,
                   child: TextField(
                     controller: otpControllers[index],
+                    focusNode: focusNodes[index],
                     keyboardType: TextInputType.number,
                     maxLength: 1,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
                     decoration: InputDecoration(
                       counterText: "",
                       border: OutlineInputBorder(
@@ -134,11 +154,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                       ),
                     ),
                     onChanged: (value) {
-                      if (value.isNotEmpty && index < 4) {
-                        FocusScope.of(context).nextFocus();
-                      }
-                      if (value.isEmpty && index > 0) {
-                        FocusScope.of(context).previousFocus();
+                      if (value.isNotEmpty && index < 5) {
+                        // Move to next field
+                        FocusScope.of(context).requestFocus(focusNodes[index + 1]);
+                      } else if (value.isEmpty && index > 0) {
+                        // Move to previous field
+                        FocusScope.of(context).requestFocus(focusNodes[index - 1]);
                       }
                     },
                   ),
@@ -157,16 +178,22 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2970FF),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: isLoading
                     ? const CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2)
-                    : const Text("Verify Code",
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      )
+                    : const Text(
+                        "Verify Code",
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
 
@@ -176,11 +203,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
               child: GestureDetector(
                 onTap: resendOtp,
                 child: const Text(
-                  "Haven’t got the email yet? Resend email",
+                  "Haven't got the email yet? Resend email",
                   style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.underline),
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
             ),
@@ -192,9 +220,10 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                 child: Text(
                   statusMessage,
                   style: TextStyle(
-                      color: statusColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold),
+                    color: statusColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
