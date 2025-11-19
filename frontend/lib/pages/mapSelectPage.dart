@@ -72,8 +72,10 @@ class _MapSelectPageState extends State<MapSelectPage> {
 
       if (placemarks.isNotEmpty) {
         Placemark p = placemarks.first;
-        _placeName =
-            "${p.name}, ${p.locality}, ${p.administrativeArea}, ${p.country}";
+        List<String> parts = [];
+        if (p.name != null && p.name!.isNotEmpty) parts.add(p.name!);
+        if (p.locality != null && p.locality!.isNotEmpty) parts.add(p.locality!);
+        _placeName = parts.isNotEmpty ? parts.join(", ") : "${pos.latitude}, ${pos.longitude}";
       } else {
         _placeName = "${pos.latitude}, ${pos.longitude}";
       }
