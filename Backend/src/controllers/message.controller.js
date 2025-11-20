@@ -4,12 +4,13 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
-
+import { getIO } from "../socket/socket.js"; 
 import fs from "fs";
 
 // ============================================
 // SEND MESSAGE
 // ============================================
+
 const sendMessage = asyncHandler(async (req, res) => {
   const { chatId, content, messageType = "text" } = req.body;
 
@@ -38,7 +39,6 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   try {
     if (req.files && req.files.length > 0) {
-      // Upload all files to Cloudinary (NO LOCAL DELETE HERE)
       const uploadPromises = req.files.map(async (file) => {
         const result = await uploadToCloudinary(file.path);
         return result?.secure_url;
@@ -75,6 +75,28 @@ const sendMessage = asyncHandler(async (req, res) => {
       select: "fullName username email profileImage",
     });
 
+    // ===================== NEW SOCKET.IO BROADCAST =====================
+    try {
+      const io = getIO();
+      io.to(chat.chatId).emit("new_message", {
+        messageId: populatedMessage.messageId,
+        chatId: chat.chatId,
+        sender: {
+          _id: populatedMessage.senderId._id,
+          fullName: populatedMessage.senderId.fullName,
+          profileImage: populatedMessage.senderId.profileImage,
+        },
+        content: populatedMessage.content,
+        media: populatedMessage.media,
+        messageType: populatedMessage.messageType,
+        isRead: populatedMessage.isRead,
+        createdAt: populatedMessage.createdAt,
+      });
+    } catch (error) {
+      // Socket.io not initialized or no users connected; safe to ignore
+    }
+    // ===================================================================
+
     return res.status(201).json(
       new ApiResponse(
         201,
@@ -96,7 +118,6 @@ const sendMessage = asyncHandler(async (req, res) => {
       )
     );
   } catch (error) {
-    // Only cleanup if multer saved something AND cloudinary didn't delete it
     if (req.files && req.files.length > 0) {
       req.files.forEach((file) => {
         if (fs.existsSync(file.path)) {
