@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/auth_link_handler.dart';
+import 'package:frontend/pages/editProfile.dart';
 
 // Pages
 import 'package:frontend/pages/startPage.dart';
@@ -54,6 +55,7 @@ class MyApp extends StatelessWidget {
         '/post': (context) => const PostPage(),
         '/profile': (context) => const ProfilePage(),
         '/forgotPassword': (context) => const ForgotPassword(),
+        '/editProfile': (context) => const Editprofile(),
       },
 
       // 🚀 DYNAMIC ROUTES (for postId)

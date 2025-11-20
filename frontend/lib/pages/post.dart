@@ -139,17 +139,39 @@ class _PostPageState extends State<PostPage> {
 
   // Input field helper
   Widget _buildInputField({required TextEditingController controller, required String hint, int maxLines = 1, IconData? prefixIcon}) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.grey) : null,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey.shade400),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: const Color(0xFF6366F1)) : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+          ),
+        ),
       ),
     );
   }
@@ -309,9 +331,9 @@ class _PostPageState extends State<PostPage> {
         return false;
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF9FAFB),
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFFF9FAFB),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -324,7 +346,7 @@ class _PostPageState extends State<PostPage> {
               padding: const EdgeInsets.only(right: 8),
               child: TextButton(
                 onPressed: _submitPost,
-                child: const Text('Post', style: TextStyle(color: Colors.blue, fontSize: 18, fontWeight: FontWeight.bold)),
+                child: const Text('Post', style: TextStyle(color: Color(0xFF6366F1), fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -367,9 +389,16 @@ class _PostPageState extends State<PostPage> {
                 height: 120,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -423,9 +452,12 @@ class _PostPageState extends State<PostPage> {
                 label: const Text('Choose on Map'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: BorderSide(color: Colors.blue.shade700),
-                  foregroundColor: Colors.blue.shade700,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  side: const BorderSide(color: Color(0xFF6366F1)),
+                  foregroundColor: const Color(0xFF6366F1),
+                  backgroundColor: Colors.white,
+                  elevation: 1,
+                  shadowColor: Colors.black.withOpacity(0.1),
                 ),
               ),
             ),
@@ -454,7 +486,7 @@ class _PostPageState extends State<PostPage> {
                 Switch(
                   value: _isAnonymous,
                   onChanged: (value) => setState(() => _isAnonymous = value),
-                  activeColor: Colors.blue,
+                  activeColor: const Color(0xFF6366F1),
                 ),
               ],
             ),

@@ -7,8 +7,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const Color kPrimaryColor = Color(0xFF4285F4);
-const Color kOrangeColor = Color(0xFFFB9A47);
-const Color kLightBlueBackground = Color(0xFFE8F0FE);
+const Color kOrangeColor = Color(0xFFFF8C32);
+const Color kLightBlueBackground = Color(0xFFD3E0FB);
 const Color kCardBackground = Color(0xFFFFFFFF);
 const Color kScaffoldBackground = Color(0xFFF5F6F8);
 
@@ -19,6 +19,29 @@ class UnauthorizedException implements Exception {
   UnauthorizedException(this.message);
   @override
   String toString() => 'UnauthorizedException: $message';
+}
+
+class CurvedBottomClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 30);
+    
+    final controlPoint = Offset(size.width / 2, size.height + 20);
+    final endPoint = Offset(size.width, size.height - 30);
+    
+    path.quadraticBezierTo(
+      controlPoint.dx, controlPoint.dy,
+      endPoint.dx, endPoint.dy,
+    );
+    
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
 class ProfilePage extends StatefulWidget {
@@ -169,21 +192,20 @@ class _ProfilePageState extends State<ProfilePage> {
     return Stack(
       alignment: Alignment.topCenter,
       children: [
-        Container(
-          height: _headerHeight,
-          decoration: BoxDecoration(
-            color: kLightBlueBackground,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(50),
-              bottomRight: Radius.circular(50),
+        ClipPath(
+          clipper: CurvedBottomClipper(),
+          child: Container(
+            height: _headerHeight,
+            decoration: BoxDecoration(
+              color: kLightBlueBackground,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
         ),
         SafeArea(
@@ -291,7 +313,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           title: const Text('Edit Profile'),
                           onTap: () {
                             Navigator.pop(context);
-                            print('Edit Profile clicked');
+                            Navigator.pushNamed(context, '/editProfile');
                           },
                         ),
                       ],
