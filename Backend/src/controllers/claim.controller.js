@@ -3,6 +3,7 @@ import { Post } from "../models/post.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { Chat } from "../models/chat.model.js";
 import { v4 as uuidv4 } from "uuid";
 
 // ============================================
@@ -235,6 +236,7 @@ const getClaimsOnMyPosts = asyncHandler(async (req, res) => {
 
 
 // Updates a claim’s status (accept/reject) by the post owner
+
 const updateClaimStatus = asyncHandler(async (req, res) => {
   const { claimId } = req.params;
   const { status } = req.body;
@@ -246,7 +248,6 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
 
   // Find claim
   const claim = await Claim.findOne({ claimId }).populate("postId");
-
   if (!claim) {
     throw new ApiError(404, "Claim not found");
   }
@@ -265,13 +266,29 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
   claim.status = status;
   await claim.save();
 
-  // If accepted, update post status to "claimed"
+  // If accepted, update post status to "claimed" and create chat
   if (status === "accepted") {
     const post = await Post.findById(claim.postId._id);
     post.status = "claimed";
     await post.save();
 
-    // TODO: Create chat session between post owner and claimer (future implementation)
+    // ✅ CREATE CHAT SESSION between post owner and claimer
+    const existingChat = await Chat.findOne({
+      postId: post._id,
+      claimId: claim._id,
+    });
+
+    if (!existingChat) {
+      await Chat.create({
+        postId: post._id,
+        claimId: claim._id,
+        participants: [post.userId, claim.claimerId],
+        lastMessage: "Chat started",
+        lastMessageAt: new Date(),
+        isActive: true,
+      });
+    }
+
     // TODO: Send notification to claimer (future implementation)
   }
 
@@ -280,7 +297,8 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
     .populate("claimerId", "fullName username email profileImage")
     .populate({
       path: "postId",
-      select: "postId type itemName description location images rewardAmount category status",
+      select:
+        "postId type itemName description location images rewardAmount category status",
     });
 
   return res

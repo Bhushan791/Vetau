@@ -30,12 +30,16 @@ import userRouter from './routes/user.routes.js'
 import categoryRouter from './routes/category.routes.js'
 import postRouter from './routes/post.routes.js'
 import claimRoutes from "./routes/claim.routes.js";
+import chatRouter from "./routes/chat.routes.js";
+import messageRouter from "./routes/message.routes.js";
 
 //routes decleration 
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/categories", categoryRouter); 
 app.use("/api/v1/posts", postRouter); 
 app.use("/api/v1/claims", claimRoutes);
+app.use("/api/v1/chats", chatRouter);
+app.use("/api/v1/messages", messageRouter);
 
 
 
