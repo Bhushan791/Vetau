@@ -65,7 +65,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   bool _isLoading = false;
   bool _isLogoutLoading = false;
-  final double _headerHeight = 280.0;
+  final double _headerHeight = 200.0;
 
   @override
   void initState() {
