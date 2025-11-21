@@ -144,7 +144,10 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           const SizedBox(height: 12),
           
           if (post["images"] != null && post["images"].isNotEmpty)
-            PostImage(images: post["images"]),
+            PostImage(
+              images: post["images"],
+              rewardAmount: post["rewardAmount"] ?? 0,
+            ),
           const SizedBox(height: 16),
           
           Text(
@@ -155,7 +158,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           
           Text("Lost Date: ${_formatDate(post["createdAt"])}", style: const TextStyle(fontWeight: FontWeight.w500)),
           Text("Location: ${post["location"] ?? ""}", style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text("Reward: Rs. 2,000", style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text("Reward: Rs. ${post["rewardAmount"] ?? 0}", style: const TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 20),
           
           Row(

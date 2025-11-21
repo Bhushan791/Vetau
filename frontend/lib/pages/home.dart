@@ -20,24 +20,46 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List posts = [];
   bool isLoading = true;
+  bool isLoadingMore = false;
+  bool hasMore = true;
+  int currentPage = 1;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     fetchPosts();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!isLoadingMore && hasMore) {
+        loadMorePosts();
+      }
+    }
   }
 
   Future<void> fetchPosts() async {
-    final url = Uri.parse("${ApiConstants.baseUrl}/posts");
+    final url = Uri.parse("${ApiConstants.baseUrl}/posts?page=1&limit=10");
 
     try {
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final parsed = jsonDecode(response.body);
+        final pagination = parsed["data"]["pagination"];
 
         setState(() {
-          posts = parsed["data"]["posts"]; // ✅ Correct extraction
+          posts = parsed["data"]["posts"];
+          hasMore = pagination["hasMore"] ?? false;
+          currentPage = 1;
           isLoading = false;
         });
       } else {
@@ -46,6 +68,35 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print("Error: $e");
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> loadMorePosts() async {
+    if (isLoadingMore || !hasMore) return;
+
+    setState(() => isLoadingMore = true);
+
+    final nextPage = currentPage + 1;
+    final url = Uri.parse("${ApiConstants.baseUrl}/posts?page=$nextPage&limit=10");
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body);
+        final newPosts = parsed["data"]["posts"];
+        final pagination = parsed["data"]["pagination"];
+
+        setState(() {
+          posts.addAll(newPosts);
+          hasMore = pagination["hasMore"] ?? false;
+          currentPage = nextPage;
+          isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading more: $e");
+      setState(() => isLoadingMore = false);
     }
   }
 
@@ -72,60 +123,64 @@ class _HomePageState extends State<HomePage> {
           builder: (context, ref, child) {
             final selectedFilters = ref.watch(filterStoreProvider);
 
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filter Component
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: FilterComponent(),
-                  ),
-
-                  // Display Selected Filters
-                  Padding(
+            return isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      selectedFilters.isEmpty
-                          ? "No filters selected"
-                          : "You selected: ${selectedFilters.join(', ')}",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Posts List
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-                            itemCount: posts.length,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => DetailHome(postId: posts[index]["postId"]),
-                                  ),
-                                );
-                                },
-                                child: PostCard(post: posts[index]),
-                              );
-                            },
+                    itemCount: posts.length + 3 + (isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: FilterComponent(),
+                        );
+                      }
+                      
+                      if (index == 1) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            selectedFilters.isEmpty
+                                ? "No filters selected"
+                                : "You selected: ${selectedFilters.join(', ')}",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                  )
-                ],
-              ),
-            );
+                        );
+                      }
+                      
+                      if (index == 2) {
+                        return const SizedBox(height: 16);
+                      }
+                      
+                      final postIndex = index - 3;
+                      
+                      if (postIndex == posts.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetailHome(postId: posts[postIndex]["postId"]),
+                            ),
+                          );
+                        },
+                        child: PostCard(post: posts[postIndex]),
+                      );
+                    },
+                  );
           },
         ),
         bottomNavigationBar: const BottomNav(currentIndex: 0),

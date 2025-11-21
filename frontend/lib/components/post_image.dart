@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 class PostImage extends StatelessWidget {
   final List images;
-  final String reward;
+  final int rewardAmount;
 
   const PostImage({
     super.key,
     required this.images,
-    this.reward = "₹ 2000",
+    required this.rewardAmount,
   });
 
   @override
@@ -43,7 +43,7 @@ class PostImage extends StatelessWidget {
             );
           },
         ),
-        if (images.isNotEmpty)
+        if (images.isNotEmpty && rewardAmount > 0)
           Positioned(
             top: 12,
             right: 12,
@@ -54,7 +54,7 @@ class PostImage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                reward,
+                "Rs. $rewardAmount",
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
