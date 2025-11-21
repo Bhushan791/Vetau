@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/config/api_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image/image.dart' as img;
 
 const Color kPrimaryColor = Color(0xFF4285F4);
 const Color kLightBlueBackground = Color(0xFFD3E0FB);
 const Color kCardBackground = Color(0xFFFFFFFF);
 const Color kScaffoldBackground = Color(0xFFF5F6F8);
+const String apiBaseUrl = ApiConstants.baseUrl;
 
 class CurvedBottomClipper extends CustomClipper<Path> {
   @override
@@ -46,6 +54,8 @@ class _EditprofileState extends State<Editprofile> {
   String _profileImage = '';
   bool _isLoading = false;
   final double _headerHeight = 200.0;
+  final ImagePicker _picker = ImagePicker();
+  File? _selectedImage;
 
   @override
   void initState() {
@@ -66,12 +76,169 @@ class _EditprofileState extends State<Editprofile> {
     setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      _nameController.text = prefs.getString('userName') ?? 'Luniva Maharjan';
-      _emailController.text = prefs.getString('userEmail') ?? 'mhrznluniva22@gmail.com';
-      _phoneController.text = '+977 - 9823456789';
-      _usernameController.text = 'LunivaUser';
+      final token = prefs.getString('accessToken') ?? "";
+      
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/users/current-user/'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Accept": "application/json",
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        _nameController.text = data['fullName'] ?? '';
+        _emailController.text = data['email'] ?? '';
+        _phoneController.text = data['address'] ?? '';
+        _usernameController.text = 'LunivaUser';
+        _profileImage = data['profileImage'] ?? '';
+      } else {
+        throw Exception('Failed to load user data');
+      }
     } catch (e) {
       print('❌ Error loading user data: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Take a picture'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (image != null) {
+        final convertedImage = await _forceConvertToJpg(File(image.path));
+        setState(() {
+          _selectedImage = convertedImage;
+        });
+        _showUploadConfirmation();
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+    }
+  }
+
+  Future<File> _forceConvertToJpg(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+
+      if (decoded == null) {
+        debugPrint("Image decode failed for ${file.path}, using original file.");
+        return file;
+      }
+
+      final jpgBytes = img.encodeJpg(decoded, quality: 85);
+      final newPath = file.path.replaceAll(RegExp(r'\.[^.]+$'), '.jpg');
+      final jpgFile = File(newPath);
+      await jpgFile.writeAsBytes(jpgBytes, flush: true);
+      debugPrint("Converted ${file.path} -> $newPath");
+      return jpgFile;
+    } catch (e) {
+      debugPrint("Error converting image to JPG: $e");
+      return file;
+    }
+  }
+
+  void _showUploadConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Upload Profile Image'),
+          content: const Text('Do you want to upload this image as your profile picture?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _updateProfileImage();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
+              child: const Text('Upload', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updateProfileImage() async {
+    if (_selectedImage == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? "";
+
+      var request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('$apiBaseUrl/users/update-profile-image'),
+      );
+
+      request.headers.addAll({
+        "Authorization": "Bearer $token",
+        "Accept": "application/json",
+      });
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'profileImage',
+          _selectedImage!.path,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+
+      final response = await request.send();
+      final body = await response.stream.bytesToString();
+
+      print("STATUS: ${response.statusCode}");
+      print("BODY: $body");
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile image updated!")),
+        );
+      } else {
+        print(body);
+        throw Exception("Upload failed");
+      }
+    } catch (e) {
+      print("ERROR: $e");
     } finally {
       setState(() => _isLoading = false);
     }
@@ -217,15 +384,19 @@ class _EditprofileState extends State<Editprofile> {
               child: CircleAvatar(
                 radius: 50,
                 backgroundColor: Colors.grey[300],
-                backgroundImage: _profileImage.isNotEmpty ? NetworkImage(_profileImage) : null,
-                child: _profileImage.isEmpty ? const Icon(Icons.person, size: 60, color: Colors.grey) : null,
+                backgroundImage: _selectedImage != null 
+                    ? FileImage(_selectedImage!) 
+                    : (_profileImage.isNotEmpty ? NetworkImage(_profileImage) : null),
+                child: _selectedImage == null && _profileImage.isEmpty 
+                    ? const Icon(Icons.person, size: 60, color: Colors.grey) 
+                    : null,
               ),
             ),
             Positioned(
               right: 0,
               bottom: 0,
               child: GestureDetector(
-                onTap: () => print('Change profile picture'),
+                onTap: _showImagePickerOptions,
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
