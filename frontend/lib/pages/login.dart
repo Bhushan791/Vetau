@@ -167,6 +167,8 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('userId', data['data']['user']['_id']);
         await prefs.setString('userName', data['data']['user']['fullName']);
         await prefs.setString('userEmail', data['data']['user']['email']);
+        await prefs.setString('userProfileImage',
+            data['data']['user']['profileImage'] ?? '');
 
         print('🍪 Refresh token automatically stored in secure cookie');
 

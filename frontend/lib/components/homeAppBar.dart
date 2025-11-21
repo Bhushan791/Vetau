@@ -1,21 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class HomeAppBar extends StatelessWidget {
+class HomeAppBar extends StatefulWidget {
   final double rewardPoints;
-  final String? profileImageUrl; // URL for network image
-  final String? profileImagePath; // Path for local image
   final VoidCallback? onNotificationTap;
   final VoidCallback? onProfileTap;
 
   const HomeAppBar({
     super.key,
     this.rewardPoints = 0,
-    this.profileImageUrl,
-    this.profileImagePath,
     this.onNotificationTap,
     this.onProfileTap,
   });
+
+  @override
+  State<HomeAppBar> createState() => _HomeAppBarState();
+}
+
+class _HomeAppBarState extends State<HomeAppBar> {
+  String? profileImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imageUrl = prefs.getString('userProfileImage');
+    if (mounted) {
+      setState(() {
+        profileImageUrl = imageUrl;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +71,7 @@ class HomeAppBar extends StatelessWidget {
           Row(
             children: [
               GestureDetector(
-                onTap: onNotificationTap,
+                onTap: widget.onNotificationTap,
                 child: CircleAvatar(
                   radius: 25 * iconScale.clamp(0.8, 1.3),
                   backgroundColor: Colors.blueAccent,
@@ -98,7 +118,7 @@ class HomeAppBar extends StatelessWidget {
                         ),
                         SizedBox(width: width * 0.02),
                         Text(
-                          rewardPoints.toStringAsFixed(2),
+                          widget.rewardPoints.toStringAsFixed(2),
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -122,7 +142,7 @@ class HomeAppBar extends StatelessWidget {
               ),
               SizedBox(width: width * 0.02),
               GestureDetector(
-                onTap: onProfileTap,
+                onTap: widget.onProfileTap,
                 child: _buildProfileAvatar(iconScale),
               ),
             ],
@@ -135,7 +155,7 @@ class HomeAppBar extends StatelessWidget {
   Widget _buildProfileAvatar(double iconScale) {
     final radius = 25 * iconScale.clamp(0.8, 1.3);
     
-    // If profile image URL exists (from API/Firebase)
+    // If profile image URL exists (from SharedPreferences)
     if (profileImageUrl != null && profileImageUrl!.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
@@ -145,18 +165,6 @@ class HomeAppBar extends StatelessWidget {
           // Error handling - will show fallback icon
         },
         child: null,
-      );
-    }
-    
-    // If local profile image path exists (from device)
-    if (profileImagePath != null && profileImagePath!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundColor: Colors.grey[300],
-        backgroundImage: AssetImage(profileImagePath!),
-        onBackgroundImageError: (exception, stackTrace) {
-          // Error handling
-        },
       );
     }
     
