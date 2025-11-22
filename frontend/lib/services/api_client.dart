@@ -1,3 +1,4 @@
+import 'package:frontend/services/cookie_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -128,38 +129,51 @@ class ApiClient extends http.BaseClient {
   }
 
   /// Refresh access token using refresh token from cookies
-  Future<bool> _refreshAccessToken() async {
-    try {
-      final tokenService = TokenService();
+Future<bool> _refreshAccessToken() async {
+  final uri = Uri.parse('$baseUrl/users/refresh-token');
 
-      print('🔄 Calling refresh endpoint...');
+  try {
+    final tokenService = TokenService();
 
-      // Create request with cookies
-      final request = http.Request('POST', Uri.parse('$baseUrl/users/refresh-token/'));
-      request.headers['Content-Type'] = 'application/json';
-      _addCookiesToRequest(request);
+    print('🔄 Refreshing access token...');
 
-      final response = await _inner.send(request);
-      final responseBody = await response.stream.bytesToString();
-      
-      _storeCookiesFromResponse(response);
+    // Load refresh cookie
+    final cookies = await CookieStorage.loadCookies(uri);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        final newAccessToken = data['data']['accessToken'];
+    final cookieHeader = cookies
+        .map((c) => '${c.name}=${c.value}')
+        .join('; ');
 
-        await tokenService.saveAccessToken(newAccessToken);
-        print('✅ Access token refreshed successfully');
+    final response = await http.post(
+      uri,
+      headers: {
+        "Cookie": cookieHeader,
+        "Content-Type": "application/json",
+      },
+    );
 
-        return true;
-      } else {
-        print('❌ Failed to refresh: ${response.statusCode}');
-        await tokenService.clearAccessToken();
-        return false;
-      }
-    } catch (e) {
-      print('❌ Error refreshing token: $e');
+    // Save updated cookie if backend sends it
+    if (response.headers['set-cookie'] != null) {
+      await CookieStorage.saveCookies(uri, [response.headers['set-cookie']!]);
+    }
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      final newAccessToken = json['data']['accessToken'];
+
+      await tokenService.saveAccessToken(newAccessToken);
+
+      print("✅ Access token refreshed");
+      return true;
+    } else {
+      print("❌ Refresh failed: ${response.statusCode}");
+      await tokenService.clearAccessToken();
       return false;
     }
+  } catch (e) {
+    print("❌ Exception during refresh: $e");
+    return false;
   }
+}
+
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/services/cookie_storage.dart';
 import 'package:frontend/services/token_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -139,8 +140,10 @@ class _LoginPageState extends State<LoginPage> {
     try {
       print('🔐 Attempting login...');
 
+      final uri = Uri.parse('$apiBaseUrl/users/login/');
+
       final response = await http.post(
-        Uri.parse('$apiBaseUrl/users/login/'),
+        uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailController.text.trim(),
@@ -148,42 +151,75 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      setState(() => _isLoading = false);
-
       if (!mounted) return;
 
+      setState(() => _isLoading = false);
+
+      // -----------------------------
+      // SUCCESS (HTTP 200)
+      // -----------------------------
       if (response.statusCode == 200) {
+        print('✅ Login successful');
+
+        // Save refresh cookie (if backend sends one)
+        if (response.headers.containsKey('set-cookie')) {
+          final cookieHeader = response.headers['set-cookie']!;
+          await CookieStorage.saveCookies(uri, [cookieHeader]);
+          print("🍪 Refresh token cookie saved");
+        } else {
+          print("🍪 No Set-Cookie found — backend may be blocking cookie");
+        }
+
         final data = jsonDecode(response.body);
         final tokenService = TokenService();
 
-        print('✅ Login successful');
-
-        // Save access token using TokenService
+        // Get access token
         final accessToken = data['data']['accessToken'];
-        await tokenService.saveAccessToken(accessToken);
 
-        // Save user info in SharedPreferences
+        // Save access token to SharedPreferences
+        await tokenService.saveAccessToken(accessToken);
+        print('✅ Access token saved to SharedPreferences');
+
+        // Save user data
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', data['data']['user']['_id']);
         await prefs.setString('userName', data['data']['user']['fullName']);
         await prefs.setString('userEmail', data['data']['user']['email']);
-        await prefs.setString('userProfileImage',
-            data['data']['user']['profileImage'] ?? '');
+        await prefs.setString(
+            'userProfileImage', data['data']['user']['profileImage'] ?? '');
 
-        print('🍪 Refresh token automatically stored in secure cookie');
+        print('👤 User profile saved to SharedPreferences');
 
+        // Navigate to home
         if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
-      } else {
-        final error = jsonDecode(response.body);
-        setState(() {
-          errorMessage = error['message'] ?? "Login failed";
-        });
+
+        return;
       }
-    } catch (e) {
+
+      // -----------------------------
+      // FAILURE (400, 401, 404, etc.)
+      // -----------------------------
+      print("❌ Login failed — Status: ${response.statusCode}");
+
+      String serverMessage = "Login failed";
+      try {
+        final errorJson = jsonDecode(response.body);
+        serverMessage = errorJson["message"] ?? serverMessage;
+      } catch (_) {}
+
+      setState(() {
+        errorMessage = serverMessage;
+      });
+    }
+
+    // -----------------------------
+    // NETWORK / SERVER ERROR
+    // -----------------------------
+    catch (e) {
       print('❌ Login error: $e');
+
       setState(() {
         _isLoading = false;
         errorMessage = "Server error. Please try again later.";
