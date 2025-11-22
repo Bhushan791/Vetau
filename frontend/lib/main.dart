@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/auth_link_handler.dart';
+import 'package:frontend/pages/chat/chat_page.dart';
 import 'package:frontend/pages/editProfile.dart';
 
 // Pages
@@ -56,6 +57,11 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/forgotPassword': (context) => const ForgotPassword(),
         '/editProfile': (context) => const Editprofile(),
+        '/messages': (context) => ChatPage(
+              conversationId: ModalRoute.of(context)!.settings.arguments
+                  as String, // Pass conversationId as argument
+              myId: 'currentUserId', // Replace with actual current user ID
+            ),
       },
 
       // 🚀 DYNAMIC ROUTES (for postId)

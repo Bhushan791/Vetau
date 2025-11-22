@@ -125,10 +125,12 @@ class _HomePageState extends State<HomePage> {
 
             return isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: posts.length + 3 + (isLoadingMore ? 1 : 0),
+                : RefreshIndicator(
+                    onRefresh: fetchPosts,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: posts.length + 3 + (isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == 0) {
                         return Padding(
@@ -180,6 +182,7 @@ class _HomePageState extends State<HomePage> {
                         child: PostCard(post: posts[postIndex]),
                       );
                     },
+                    ),
                   );
           },
         ),
