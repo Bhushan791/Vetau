@@ -45,7 +45,16 @@ class TokenService {
       if (parts.length != 3) return null;
 
       final payload = parts[1];
-      final padded = payload + '=' * (4 - payload.length % 4);
+      // Proper base64 padding
+      String padded = payload;
+      switch (padded.length % 4) {
+        case 2:
+          padded += '==';
+          break;
+        case 3:
+          padded += '=';
+          break;
+      }
       final decoded = utf8.decode(base64Url.decode(padded));
       return jsonDecode(decoded);
     } catch (e) {

@@ -10,7 +10,7 @@ import 'package:frontend/pages/login.dart';
 import 'package:frontend/pages/register.dart';
 import 'package:frontend/pages/home.dart';
 import 'package:frontend/pages/search.dart';
-import 'package:frontend/pages/chats.dart';
+import 'package:frontend/pages/chat/all_chats.dart';
 import 'package:frontend/pages/more.dart';
 import 'package:frontend/pages/post.dart';
 import 'package:frontend/pages/detail_home.dart';
@@ -57,14 +57,9 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/forgotPassword': (context) => const ForgotPassword(),
         '/editProfile': (context) => const Editprofile(),
-        '/messages': (context) => ChatPage(
-              conversationId: ModalRoute.of(context)!.settings.arguments
-                  as String, // Pass conversationId as argument
-              myId: 'currentUserId', // Replace with actual current user ID
-            ),
       },
 
-      // 🚀 DYNAMIC ROUTES (for postId)
+      // 🚀 DYNAMIC ROUTES (for postId and chat)
       onGenerateRoute: (settings) {
         // For opening detail page with postId
         if (settings.name == '/detailHome') {
@@ -72,6 +67,15 @@ class MyApp extends StatelessWidget {
 
           return MaterialPageRoute(
             builder: (_) => DetailHome(postId: postId),
+          );
+        }
+
+        // For opening chat details with chatId
+        if (settings.name == '/chat_details') {
+          final String chatId = settings.arguments as String;
+
+          return MaterialPageRoute(
+            builder: (_) => ChatPage(chatId: chatId),
           );
         }
 

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/components/bottomNav.dart';
 import 'package:frontend/components/homeAppBar.dart';
+import 'package:frontend/pages/chat/chat_page.dart';
 import 'package:frontend/services/chat_service.dart';
 import 'package:frontend/models/chat_model.dart';
-import 'package:frontend/pages/chat_page.dart';
+
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -101,11 +102,10 @@ class _ChatsPageState extends State<ChatsPage> {
                             ],
                           ),
                           onTap: () {
-                            Navigator.push(
+                            Navigator.pushNamed(
                               context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatPage(chat: chat),
-                              ),
+                              '/chat_details',
+                              arguments: chat.chatId,
                             );
                           },
                         ),

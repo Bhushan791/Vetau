@@ -22,7 +22,23 @@ class ApiClient extends http.BaseClient {
   ApiClient({
     required this.baseUrl,
     required this.onSessionExpired,
-  });
+  }) {
+    _loadCookiesFromStorage();
+  }
+
+  /// Load cookies from CookieStorage into static map
+  Future<void> _loadCookiesFromStorage() async {
+    try {
+      final uri = Uri.parse(baseUrl);
+      final cookies = await CookieStorage.loadCookies(uri);
+      for (final cookie in cookies) {
+        _cookies[cookie.name] = cookie.value;
+        print('🍪 Loaded cookie from storage: ${cookie.name}=${cookie.value}');
+      }
+    } catch (e) {
+      print('❌ Error loading cookies from storage: $e');
+    }
+  }
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -123,8 +139,22 @@ class ApiClient extends http.BaseClient {
           print('🍪 Stored cookie: ${parts[0].trim()}=${parts[1].trim()}');
         }
       }
+      
+      // Also save to persistent storage
+      _saveCookiesToStorage(setCookieHeaders);
     } else {
       print('🍪 No set-cookie header in response');
+    }
+  }
+
+  /// Save cookies to persistent storage
+  Future<void> _saveCookiesToStorage(String setCookieHeader) async {
+    try {
+      final uri = Uri.parse(baseUrl);
+      await CookieStorage.saveCookies(uri, [setCookieHeader]);
+      print('🍪 Cookies saved to persistent storage');
+    } catch (e) {
+      print('❌ Error saving cookies to storage: $e');
     }
   }
 
@@ -137,25 +167,30 @@ Future<bool> _refreshAccessToken() async {
 
     print('🔄 Refreshing access token...');
 
-    // Load refresh cookie
-    final cookies = await CookieStorage.loadCookies(uri);
-
-    final cookieHeader = cookies
-        .map((c) => '${c.name}=${c.value}')
+    // Use static cookies map
+    final cookieHeader = _cookies.entries
+        .map((entry) => '${entry.key}=${entry.value}')
         .join('; ');
+
+    print('🍪 Using cookies for refresh: $cookieHeader');
 
     final response = await http.post(
       uri,
       headers: {
-        "Cookie": cookieHeader,
+        if (cookieHeader.isNotEmpty) "Cookie": cookieHeader,
         "Content-Type": "application/json",
       },
     );
 
-    // Save updated cookie if backend sends it
-    if (response.headers['set-cookie'] != null) {
-      await CookieStorage.saveCookies(uri, [response.headers['set-cookie']!]);
-    }
+    print('🔄 Refresh response status: ${response.statusCode}');
+    print('🔄 Refresh response body: ${response.body}');
+
+    // Store cookies from refresh response
+    _storeCookiesFromResponse(http.StreamedResponse(
+      http.ByteStream.fromBytes(response.bodyBytes),
+      response.statusCode,
+      headers: response.headers,
+    ));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
