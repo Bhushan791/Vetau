@@ -43,6 +43,27 @@ class MessageModel {
     );
   }
 
+  /// PARSING BACKEND SOCKET MESSAGE FORMAT
+  factory MessageModel.fromBackendSocket(Map<String, dynamic> json, {String? currentUserId}) {
+    final sender = json["sender"] ?? {};
+    final senderId = sender["_id"]?.toString() ?? "";
+
+    return MessageModel(
+      messageId: json["messageId"].toString(),
+      senderId: senderId,
+      senderName: sender["fullName"] ?? "",
+      senderImage: sender["profileImage"] ?? "",
+      content: json["content"] ?? "",
+      media: json["media"] != null
+          ? List<String>.from(json["media"].map((m) => m.toString()))
+          : [],
+      messageType: json["messageType"] ?? "text",
+      isRead: json["isRead"] ?? false,
+      createdAt: DateTime.tryParse(json["createdAt"] ?? "") ?? DateTime.now(),
+      isMine: currentUserId != null && senderId == currentUserId,
+    );
+  }
+
   /// TO JSON (for socket outgoing messages)
   Map<String, dynamic> toJson() {
     return {

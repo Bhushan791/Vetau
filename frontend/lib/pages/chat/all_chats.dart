@@ -25,7 +25,7 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Future<void> fetchChats() async {
     try {
-      final fetchedChats = await ChatService.getChats(context);
+      final fetchedChats = await ChatService.getChats();
       setState(() {
         chats = fetchedChats;
         isLoading = false;

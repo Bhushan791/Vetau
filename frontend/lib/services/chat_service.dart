@@ -5,7 +5,7 @@ import 'package:frontend/models/chat_model.dart';
 import 'package:frontend/services/api_client.dart';
 
 class ChatService {
-  static Future<List<ChatModel>> getChats(BuildContext context) async {
+  static Future<List<ChatModel>> getChats() async {
     final apiClient = ApiClient(
       baseUrl: ApiConstants.baseUrl,
       onSessionExpired: (context) {},
@@ -21,6 +21,29 @@ class ChatService {
       return chats.map((chat) => ChatModel.fromJson(chat)).toList();
     } else {
       throw Exception('Failed to load chats: ${response.statusCode}');
+    }
+  }
+  static Future<void> sendMessage({
+    required String chatId,
+    required String content,
+    required String messageType,
+  }) async {
+    final apiClient = ApiClient(
+      baseUrl: ApiConstants.baseUrl,
+      onSessionExpired: (context) {},
+    );
+    
+    final response = await apiClient.post(
+      Uri.parse('${ApiConstants.baseUrl}/chats/$chatId/messages'),
+      body: json.encode({
+        'content': content,
+        'messageType': messageType,
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to send message: ${response.statusCode}');
     }
   }
 }
