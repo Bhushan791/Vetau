@@ -18,23 +18,26 @@ class SocketService {
   /// Initialize and connect socket
   Future<void> initSocket() async {
   final tokenService = TokenService();
-  final token = await tokenService.getAccessToken(); // async
+  final token = await tokenService.getAccessToken();
+
+  print('🔧 Initializing socket with token: ${token?.substring(0, 20)}...');
 
   socket = io.io(
     SocketConfig.socketBaseUrl,
     io.OptionBuilder()
         .setTransports(['websocket'])
         .enableAutoConnect()
-        .enableForceNew()
+        .setReconnectionAttempts(5)
+        .setReconnectionDelay(1000)
         .setAuth({
           'token': 'Bearer $token',
         })
-        .setReconnectionAttempts(5)
-        .setReconnectionDelay(500)
         .build(),
   );
 
   _registerCoreListeners();
+  
+  print('🔧 Socket object created, waiting for connection...');
 }
 
 
@@ -98,7 +101,8 @@ class SocketService {
 
   /// Send message to backend
   void sendMessage(String chatId, String content) {
-    if (!isConnected) {
+    print('📤 Attempting to send message. Connected: $isConnected, Socket connected: ${socket.connected}');
+    if (!isConnected && !socket.connected) {
       print('⚠️ Cannot send message, socket not connected');
       return;
     }
@@ -106,6 +110,7 @@ class SocketService {
       'chatId': chatId,
       'content': content,
     });
+    print('📤 Message emitted via socket');
   }
 
   /// Listen for incoming messages
@@ -154,14 +159,14 @@ class SocketService {
     socket.emit('stop_typing', {'chatId': chatId});
   }
 
-  /// Clear all listeners to prevent duplicates
+  /// Clear all listeners to prevent duplicates (but keep core connection listeners)
   void clearListeners() {
     socket.off('new_message');
     socket.off('message_sent');
-    socket.off('error');
     socket.off('joined_chat');
     socket.off('user_typing');
     socket.off('user_stop_typing');
+    // Don't clear 'connect', 'disconnect', 'connect_error', 'error' - these are core listeners
   }
 
   /// Reconnect socket manually
