@@ -16,6 +16,10 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   late ChatController chatController;
+  bool isTyping = false;
+  String typingUser = '';
+  bool isSocketConnected = false;
+  String? socketError;
   
 
   @override
@@ -25,6 +29,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // Initialize controller
     chatController = ref.read(chatControllerProvider(widget.chatId));
 
+    // Add typing listener
+    _messageController.addListener(_onTextChanged);
 
     // Load messages from API
     chatController.loadInitialMessages();
@@ -34,24 +40,118 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _initSocket() async {
-    await SocketService.instance.initSocket();
-    SocketService.instance.joinRoom(widget.chatId);
-    await chatController.initSocketListeners();
+    try {
+      await SocketService.instance.initSocket();
+      
+      // Monitor connection status
+      SocketService.instance.socket.on('connect', (_) {
+        setState(() {
+          isSocketConnected = true;
+          socketError = null;
+        });
+        print('✅ Socket connected successfully');
+      });
+      
+      SocketService.instance.socket.on('disconnect', (_) {
+        setState(() {
+          isSocketConnected = false;
+        });
+        print('❌ Socket disconnected');
+      });
+      
+      SocketService.instance.socket.on('connect_error', (error) {
+        setState(() {
+          isSocketConnected = false;
+          socketError = error.toString();
+        });
+        print('❌ Socket connection error: $error');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection error: ${error.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      });
+      
+      SocketService.instance.joinRoom(widget.chatId);
+      await chatController.initSocketListeners();
+      
+      // Listen for typing indicators
+      SocketService.instance.onUserTyping((data) {
+        setState(() {
+          typingUser = data['fullName'] ?? 'Someone';
+        });
+      });
+      
+      SocketService.instance.onUserStopTyping((data) {
+        setState(() {
+          typingUser = '';
+        });
+      });
+    } catch (e) {
+      setState(() {
+        isSocketConnected = false;
+        socketError = e.toString();
+      });
+      print('❌ Socket initialization error: $e');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to connect to chat server: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Send via API and socket
+    if (!isSocketConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Not connected to chat server. Please wait...'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Stop typing indicator
+    SocketService.instance.sendStopTyping(widget.chatId);
+    setState(() => isTyping = false);
+
+    // Send message
     await chatController.sendMessage(text);
 
     _messageController.clear();
   }
 
+  void _onTextChanged() {
+    final text = _messageController.text.trim();
+    if (text.isNotEmpty && !isTyping) {
+      SocketService.instance.sendTyping(widget.chatId);
+      setState(() => isTyping = true);
+    } else if (text.isEmpty && isTyping) {
+      SocketService.instance.sendStopTyping(widget.chatId);
+      setState(() => isTyping = false);
+    }
+  }
+
   @override
   void dispose() {
+    _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
+    // Clear messages when leaving chat
+    ref.read(chatMessagesProvider(widget.chatId).notifier).clear();
+    // Clear socket listeners
+    SocketService.instance.clearListeners();
+    // Clear connection status listeners
+    SocketService.instance.socket.off('connect');
+    SocketService.instance.socket.off('disconnect');
+    SocketService.instance.socket.off('connect_error');
     super.dispose();
   }
 
@@ -63,6 +163,30 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       appBar: AppBar(
         title: const Text('Chat'),
         backgroundColor: Colors.blue,
+        actions: [
+          // Connection status indicator
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isSocketConnected ? Icons.wifi : Icons.wifi_off,
+                  color: isSocketConnected ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isSocketConnected ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    color: isSocketConnected ? Colors.green : Colors.red,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -117,25 +241,44 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     },
                   ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(),
+          Column(
+            children: [
+              // Typing indicator
+              if (typingUser.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    '$typingUser is typing...',
+                    style: const TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                )
-              ],
-            ),
+              // Message input
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.send),
+                      onPressed: _sendMessage,
+                    )
+                  ],
+                ),
+              ),
+            ],
           )
         ],
       ),

@@ -11,6 +11,9 @@ class SocketService {
   bool isConnected = false;
 
   SocketService._internal();
+  
+  // Getter for connection status
+  bool get connectionStatus => isConnected && socket.connected;
 
   /// Initialize and connect socket
   Future<void> initSocket() async {
@@ -36,17 +39,17 @@ class SocketService {
 
 
   void _registerCoreListeners() {
-    socket.onConnect((_) {
+    socket.on('connect', (_) {
       isConnected = true;
       print('🔌 SOCKET CONNECTED: ${socket.id}');
     });
 
-    socket.onDisconnect((_) {
+    socket.on('disconnect', (_) {
       isConnected = false;
       print('🔌 SOCKET DISCONNECTED');
     });
 
-    socket.onConnectError((data) {
+    socket.on('connect_error', (data) {
       isConnected = false;
       final errorMsg = data.toString();
       print('❌ SOCKET CONNECTION ERROR: $errorMsg');
@@ -57,7 +60,7 @@ class SocketService {
       }
     });
 
-    socket.onError((data) {
+    socket.on('error', (data) {
       final errorMsg = data.toString();
       print('❌ SOCKET ERROR: $errorMsg');
     });
@@ -129,6 +132,36 @@ class SocketService {
       };
       callback(error);
     });
+  }
+
+  /// Listen for typing indicators
+  void onUserTyping(void Function(dynamic) callback) {
+    socket.on('user_typing', callback);
+  }
+
+  void onUserStopTyping(void Function(dynamic) callback) {
+    socket.on('user_stop_typing', callback);
+  }
+
+  /// Send typing indicator
+  void sendTyping(String chatId) {
+    if (!isConnected) return;
+    socket.emit('typing', {'chatId': chatId});
+  }
+
+  void sendStopTyping(String chatId) {
+    if (!isConnected) return;
+    socket.emit('stop_typing', {'chatId': chatId});
+  }
+
+  /// Clear all listeners to prevent duplicates
+  void clearListeners() {
+    socket.off('new_message');
+    socket.off('message_sent');
+    socket.off('error');
+    socket.off('joined_chat');
+    socket.off('user_typing');
+    socket.off('user_stop_typing');
   }
 
   /// Reconnect socket manually

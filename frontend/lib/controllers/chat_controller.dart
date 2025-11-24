@@ -5,6 +5,7 @@ import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/socket_service.dart';
 import 'package:frontend/services/token_service.dart';
 import 'package:frontend/stores/chat_message_provider.dart';
+import 'package:frontend/stores/chats_provider.dart';
 import 'package:frontend/services/chat_service.dart';
 
 final chatControllerProvider =
@@ -63,21 +64,8 @@ class ChatController {
   /// SEND MESSAGE
   /// ---------------------------
   Future<void> sendMessage(String content) async {
-    try {
-      // 1. Send via API first (for persistence)
-      await ChatService.sendMessage(
-        chatId: roomId,
-        content: content,
-        messageType: "text",
-      );
-
-      // 2. Send via socket (for real-time)
-      SocketService.instance.sendMessage(roomId, content);
-    } catch (e) {
-      print('❌ Error sending message: $e');
-      // Still try socket even if API fails
-      SocketService.instance.sendMessage(roomId, content);
-    }
+    // Only send via socket - backend handles both persistence and real-time
+    SocketService.instance.sendMessage(roomId, content);
   }
 
   /// ---------------------------
@@ -87,16 +75,37 @@ class ChatController {
     final socketService = SocketService.instance;
     final currentUserId = await _getCurrentUserId();
 
-    // Listen for new messages from other users
+    // Clear existing listeners to prevent duplicates
+    socketService.clearListeners();
+
+    // Listen for new messages (from others)
     socketService.onNewMessage((data) {
       final message = MessageModel.fromBackendSocket(data, currentUserId: currentUserId);
       ref.read(chatMessagesProvider(roomId).notifier).addMessage(message);
+      
+      // Update last message in chats list
+      ref.read(chatsProvider.notifier).updateLastMessage(roomId, message.content);
     });
 
-    // Listen for message sent confirmation
+    // Listen for message sent confirmation (my messages)
     socketService.onMessageSent((data) {
       final message = MessageModel.fromBackendSocket(data, currentUserId: currentUserId);
       ref.read(chatMessagesProvider(roomId).notifier).addMessage(message);
+      
+      // Update last message in chats list
+      ref.read(chatsProvider.notifier).updateLastMessage(roomId, message.content);
+      print('✅ Message sent successfully');
+    });
+
+    // Listen for typing indicators
+    socketService.onUserTyping((data) {
+      // Handle typing indicator
+      print('📝 ${data['fullName']} is typing...');
+    });
+
+    socketService.onUserStopTyping((data) {
+      // Handle stop typing
+      print('📝 Stopped typing');
     });
 
     // Listen for errors
