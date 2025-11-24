@@ -45,4 +45,5 @@ data/
 
 
 public/temp/
-../main.html
+../main.html\
+socket_testing.txt
