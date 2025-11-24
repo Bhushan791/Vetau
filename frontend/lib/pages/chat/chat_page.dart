@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/models/message_model.dart';
@@ -5,6 +6,7 @@ import 'package:frontend/services/socket_service.dart';
 import 'package:frontend/controllers/chat_controller.dart';
 import 'package:frontend/stores/chat_message_provider.dart';
 import 'package:frontend/stores/socket_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String chatId;
@@ -16,9 +18,12 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class _ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
   late ChatController chatController;
   bool isTyping = false;
   String typingUser = '';
+  XFile? _selectedImage;
   
 
   @override
@@ -83,6 +88,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     await chatController.sendMessage(text);
 
     _messageController.clear();
+    
+    // Scroll to bottom after sending
+    Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
   }
 
   void _onTextChanged() {
@@ -96,10 +104,125 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (image != null) {
+      _showImagePreview(image);
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    if (image != null) {
+      _showImagePreview(image);
+    }
+  }
+
+  void _showImagePreview(XFile image) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              child: Image.file(
+                File(image.path),
+                fit: BoxFit.contain,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      setState(() => _selectedImage = image);
+                      try {
+                        await chatController.sendImageMessage(image);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Image sent successfully')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Image sending not supported yet'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      }
+                      setState(() => _selectedImage = null);
+                      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+                    },
+                    child: const Text('Send'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo),
+                title: const Text("Pick from Gallery"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFromGallery();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text("Take a Photo"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFromCamera();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
+    _scrollController.dispose();
     // Clear messages when leaving chat
     ref.read(chatMessagesProvider(widget.chatId).notifier).clear();
     // Clear socket listeners
@@ -122,9 +245,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: messages.isEmpty
                 ? const Center(child: Text('No messages yet'))
                 : ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
+                      // Auto-scroll when new message arrives
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (index == messages.length - 1) {
+                          _scrollToBottom();
+                        }
+                      });
                       final message = messages[index];
                       final isMine = message.isMine;
 
@@ -190,6 +320,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.attach_file),
+                      onPressed: _showImageSourceSheet,
+                      color: Colors.grey[600],
+                    ),
                     Expanded(
                       child: TextField(
                         controller: _messageController,
@@ -202,6 +337,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     IconButton(
                       icon: const Icon(Icons.send),
                       onPressed: _sendMessage,
+                      color: Colors.blue,
                     )
                   ],
                 ),

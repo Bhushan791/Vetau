@@ -69,6 +69,20 @@ class ChatController {
   }
 
   /// ---------------------------
+  /// SEND IMAGE MESSAGE
+  /// ---------------------------
+  Future<void> sendImageMessage(dynamic image) async {
+    try {
+      await ChatService.sendImageMessage(
+        chatId: roomId,
+        image: image,
+      );
+    } catch (e) {
+      print('❌ Error sending image: $e');
+    }
+  }
+
+  /// ---------------------------
   /// SOCKET LISTENERS
   /// ---------------------------
   Future<void> initSocketListeners() async {

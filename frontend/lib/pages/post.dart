@@ -68,6 +68,7 @@ class PostPage extends StatefulWidget {
 class _PostPageState extends State<PostPage> {
   PostType _selectedPostType = PostType.lost;
   bool _isAnonymous = false;
+  bool _isLoading = false;
 
   // Controllers for text fields
   final TextEditingController _headingController = TextEditingController();
@@ -242,6 +243,8 @@ class _PostPageState extends State<PostPage> {
 
   // Submit post
   void _submitPost() async {
+    setState(() => _isLoading = true);
+
     // Future payload (KEEP THIS) ---------------------------
     final prefs = await SharedPreferences.getInstance();
     final accessToken = prefs.getString('accessToken');
@@ -262,6 +265,7 @@ class _PostPageState extends State<PostPage> {
     request.fields['rewardAmount'] = _rewardController.text.trim();
     request.fields['description'] = _descriptionController.text.trim();
     request.fields['tags'] = _tagsController.text.trim();
+    request.fields['isAnonymous'] = _isAnonymous.toString();
 
     // Location text only
     request.fields['location'] = _locationController.text.trim();
@@ -306,16 +310,20 @@ class _PostPageState extends State<PostPage> {
       print("Response Status: ${response.statusCode}");
       print("Response Body: ${response.body}");
 
+      setState(() => _isLoading = false);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Post created successfully")),
         );
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Failed to create post")),
         );
       }
     } catch (e) {
+      setState(() => _isLoading = false);
       debugPrint("Request error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Failed to create post")),
@@ -330,9 +338,11 @@ class _PostPageState extends State<PostPage> {
         Navigator.pop(context);
         return false;
       },
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF9FAFB),
-        appBar: AppBar(
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: const Color(0xFFF9FAFB),
+            appBar: AppBar(
           backgroundColor: const Color(0xFFF9FAFB),
           elevation: 0,
           leading: IconButton(
@@ -493,8 +503,17 @@ class _PostPageState extends State<PostPage> {
 
             const SizedBox(height: 30),
           ]),
-        ),
-        bottomNavigationBar: const BottomNav(currentIndex: 2),
+            ),
+            bottomNavigationBar: const BottomNav(currentIndex: 2),
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+              ),
+            ),
+        ],
       ),
     );
   }
