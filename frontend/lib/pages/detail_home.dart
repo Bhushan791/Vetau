@@ -123,17 +123,54 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     final comments = post["comments"] ?? [];
     final user = post["userId"] ?? {};
 
+    // Handle location - can be String or Map
+    final location = post["location"];
+    final String locationText = location is String 
+        ? location 
+        : (location is Map ? (location["name"] ?? "Unknown") : "Unknown");
+    
+    // Handle user name
+    final String userName = (post["isAnonymous"] == true) 
+        ? "Anonymous" 
+        : (user is Map ? (user["fullName"] ?? "Unknown") : "Unknown");
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PostHeader(
-            user: user,
-            post: post,
-            loggedInUserId: loggedInUserId,
-            onEdit: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Editpost())),
-            onDelete: deletePost,
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundImage: user is Map && user["profileImage"] != null
+                    ? NetworkImage(user["profileImage"])
+                    : null,
+                child: user is Map && user["profileImage"] == null
+                    ? Text(userName[0].toUpperCase())
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(_formatDate(post["createdAt"]), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              if (loggedInUserId != null && user is Map && user["_id"] == loggedInUserId)
+                PopupMenuButton(
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: "edit", child: Text("Edit")),
+                    const PopupMenuItem(value: "delete", child: Text("Delete")),
+                  ],
+                  onSelected: (value) {
+                    if (value == "edit") Navigator.push(context, MaterialPageRoute(builder: (_) => Editpost()));
+                    if (value == "delete") deletePost();
+                  },
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           
@@ -156,8 +193,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           ),
           const SizedBox(height: 8),
           
-          Text("Lost Date: ${_formatDate(post["createdAt"])}", style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text("Location: ${post["location"] ?? ""}", style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text("Location: $locationText", style: const TextStyle(fontWeight: FontWeight.w500)),
           Text("Reward: Rs. ${post["rewardAmount"] ?? 0}", style: const TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 20),
           
@@ -201,8 +237,35 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
                 ),
                 const SizedBox(height: 16),
                 
-                for (int i = 0; i < comments.length; i++)
-                  CommentItem(index: i, comment: comments[i]),
+                if (comments.isNotEmpty)
+                  ...comments.asMap().entries.map((entry) {
+                    final comment = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            child: Text((comment["userId"]?["fullName"]?[0] ?? "U").toUpperCase()),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  comment["userId"]?["fullName"] ?? "Unknown",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                Text(comment["text"] ?? ""),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
               ],
             ),
           ),

@@ -195,11 +195,11 @@ class _HomePageState extends State<HomePage> {
                   return KeepAlive(
                     child: GestureDetector(
                       onTap: () {
+                        final postId = posts[postIndex]["postId"] ?? posts[postIndex]["_id"];
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                DetailHome(postId: posts[postIndex]["postId"]),
+                            builder: (_) => DetailHome(postId: postId.toString()),
                           ),
                         );
                       },
@@ -273,6 +273,12 @@ class PostCard extends StatelessWidget {
     final reward = post["rewardAmount"] ?? 0;
     final String userName =
         (post["isAnonymous"] == true) ? "Anonymous" : (user?["fullName"] ?? "Unknown");
+    
+    // Handle location - can be String or Map
+    final location = post["location"];
+    final String locationText = location is String 
+        ? location 
+        : (location is Map ? (location["name"] ?? "Unknown") : "Unknown");
 
     return Card(
       elevation: 3,
@@ -367,7 +373,7 @@ class PostCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        post["location"] ?? "Unknown",
+                        locationText,
                         softWrap: true,
                       ),
                     ),
