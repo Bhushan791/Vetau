@@ -50,6 +50,11 @@ class ApiClient extends http.BaseClient {
     // Check if access token is expired
     if (await tokenService.isAccessTokenExpired()) {
       print('🔄 Access token expired, refreshing...');
+      if (_cookies.isEmpty) {
+        print('❌ No refresh token available, clearing session');
+        await tokenService.clearAccessToken();
+        throw UnauthorizedException('Session expired. Please login again.');
+      }
       final refreshed = await _refreshAccessToken();
       if (!refreshed) {
         throw UnauthorizedException('Session expired. Please login again.');

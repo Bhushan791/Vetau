@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:ui' as ui;
 
 class PostImage extends StatelessWidget {
   final List images;
@@ -31,13 +33,27 @@ class PostImage extends StatelessWidget {
               onTap: () => _showFullScreenImage(context, images, index),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  images[index],
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[300],
-                    child: const Center(child: Icon(Icons.broken_image, size: 40)),
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                      child: CachedNetworkImage(
+                        imageUrl: images[index],
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: Colors.black12),
+                        errorWidget: (_, __, ___) => Container(color: Colors.grey[300]),
+                      ),
+                    ),
+                    Center(
+                      child: CachedNetworkImage(
+                        imageUrl: images[index],
+                        fit: BoxFit.contain,
+                        placeholder: (_, __) => const SizedBox(),
+                        errorWidget: (_, __, ___) => const Icon(Icons.broken_image, size: 40),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -120,10 +136,11 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
         itemBuilder: (context, index) {
           return InteractiveViewer(
             child: Center(
-              child: Image.network(
-                widget.images[index],
+              child: CachedNetworkImage(
+                imageUrl: widget.images[index],
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
+                placeholder: (_, __) => const CircularProgressIndicator(color: Colors.white),
+                errorWidget: (_, __, ___) => const Icon(
                   Icons.broken_image,
                   color: Colors.white,
                   size: 100,

@@ -113,6 +113,11 @@ class _ProfilePageState extends State<ProfilePage> {
         await prefs.setString('userEmail', _userEmail);
         await prefs.setString('userId', _userId);
       }
+    } on UnauthorizedException catch (e) {
+      print('❌ Error fetching user data: $e');
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
     } catch (e) {
       print('❌ Error fetching user data: $e');
     }

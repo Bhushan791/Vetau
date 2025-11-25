@@ -8,7 +8,36 @@ import 'package:frontend/components/homeAppBar.dart';
 import 'package:frontend/components/bottomNav.dart';
 import 'package:frontend/components/filter_component.dart';
 import 'package:frontend/stores/filter_store.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui' as ui;
+
+// =====================================================================
+//                         KEEPS LIST ITEMS ALIVE
+// =====================================================================
+
+class KeepAlive extends StatefulWidget {
+  final Widget child;
+  const KeepAlive({super.key, required this.child});
+
+  @override
+  State<KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<KeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+// =====================================================================
+//                                HOME PAGE
+// =====================================================================
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -39,10 +68,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (!isLoadingMore && hasMore) {
-        loadMorePosts();
-      }
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (!isLoadingMore && hasMore) loadMorePosts();
     }
   }
 
@@ -84,20 +112,18 @@ class _HomePageState extends State<HomePage> {
 
       if (response.statusCode == 200) {
         final parsed = jsonDecode(response.body);
-        final newPosts = parsed["data"]["posts"];
-        final pagination = parsed["data"]["pagination"];
 
         setState(() {
-          posts.addAll(newPosts);
-          hasMore = pagination["hasMore"] ?? false;
+          posts.addAll(parsed["data"]["posts"]);
+          hasMore = parsed["data"]["pagination"]["hasMore"];
           currentPage = nextPage;
-          isLoadingMore = false;
         });
       }
     } catch (e) {
       print("Error loading more: $e");
-      setState(() => isLoadingMore = false);
     }
+
+    setState(() => isLoadingMore = false);
   }
 
   @override
@@ -114,76 +140,75 @@ class _HomePageState extends State<HomePage> {
           child: HomeAppBar(
             rewardPoints: 120.76,
             onNotificationTap: () {},
-            onProfileTap: () {
-              Navigator.pushNamed(context, '/profile');
-            },
+            onProfileTap: () => Navigator.pushNamed(context, '/profile'),
           ),
         ),
         body: Consumer(
           builder: (context, ref, child) {
             final selectedFilters = ref.watch(filterStoreProvider);
 
-            return isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: fetchPosts,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: posts.length + 3 + (isLoadingMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: FilterComponent(),
-                        );
-                      }
-                      
-                      if (index == 1) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            selectedFilters.isEmpty
-                                ? "No filters selected"
-                                : "You selected: ${selectedFilters.join(', ')}",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                            ),
+            if (isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            return RefreshIndicator(
+              onRefresh: fetchPosts,
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: posts.length + 3 + (isLoadingMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: FilterComponent(),
+                    );
+                  }
+
+                  if (index == 1) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        selectedFilters.isEmpty
+                            ? "No filters selected"
+                            : "You selected: ${selectedFilters.join(', ')}",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (index == 2) return const SizedBox(height: 16);
+
+                  final postIndex = index - 3;
+
+                  if (postIndex == posts.length) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  return KeepAlive(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                DetailHome(postId: posts[postIndex]["postId"]),
                           ),
                         );
-                      }
-                      
-                      if (index == 2) {
-                        return const SizedBox(height: 16);
-                      }
-                      
-                      final postIndex = index - 3;
-                      
-                      if (postIndex == posts.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-                      
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetailHome(postId: posts[postIndex]["postId"]),
-                            ),
-                          );
-                        },
-                        child: PostCard(post: posts[postIndex]),
-                      );
-                    },
+                      },
+                      child: PostCard(post: posts[postIndex]),
                     ),
                   );
+                },
+              ),
+            );
           },
         ),
         bottomNavigationBar: const BottomNav(currentIndex: 0),
@@ -192,44 +217,15 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-
-
-// ---------------------------------------------------------------
-//                     POST CARD WIDGET
-// ---------------------------------------------------------------
+// =====================================================================
+//                              OPTIMIZED POST CARD
+// =====================================================================
 
 class PostCard extends StatelessWidget {
   final Map post;
   const PostCard({super.key, required this.post});
 
-  // Build image from URL
-  Widget _buildImage() {
-    final List images = post["images"] ?? [];
-    if (images.isEmpty) {
-      return Container(
-        height: 200,
-        color: Colors.grey[300],
-        child: const Center(
-          child: Icon(Icons.image_not_supported, size: 40),
-        ),
-      );
-    }
-
-    final String rawUrl = images[0]?.toString() ?? "";
-    final bool isNetwork = rawUrl.toLowerCase().startsWith("http");
-
-    if (!isNetwork || rawUrl.trim().isEmpty) {
-      // Not a network image: show placeholder (prevents file:/// errors)
-      return Container(
-        height: 200,
-        color: Colors.grey[300],
-        child: const Center(
-          child: Icon(Icons.broken_image, size: 40),
-        ),
-      );
-    }
-
-    // At this point we have a valid network URL. Show reddit-style card:
+  Widget _buildImage(String url) {
     return SizedBox(
       height: 200,
       width: double.infinity,
@@ -238,41 +234,26 @@ class PostCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background image (cover) + dark overlay
-            Image.network(
-              rawUrl,
-              fit: BoxFit.cover,
-              // don't crash app while loading
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(color: Colors.black12);
-              },
-              errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
-            ),
-
-            // Blur + darken layer
-            BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 4.0, sigmaY: 4.0),
-              child: Container(
-                color: Colors.black.withOpacity(0.35),
+            // Blurred background (LESS blur now)
+            ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: Colors.black12),
+                errorWidget: (_, __, ___) =>
+                    Container(color: Colors.grey[300]),
               ),
             ),
 
-            // Foreground full image centered (shows full vertical image)
+            // Foreground clean image
             Center(
-              child: Image.network(
-                rawUrl,
+              child: CachedNetworkImage(
+                imageUrl: url,
                 fit: BoxFit.contain,
-                // ensure it doesn't overflow; gives full image view
-                width: double.infinity,
-                height: double.infinity,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const SizedBox.shrink();
-                },
-                errorBuilder: (_, __, ___) => const Center(
-                  child: Icon(Icons.broken_image, size: 40),
-                ),
+                placeholder: (_, __) => const SizedBox(),
+                errorWidget: (_, __, ___) =>
+                    const Icon(Icons.broken_image, size: 40),
               ),
             ),
           ],
@@ -283,11 +264,15 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final images = post["images"] ?? [];
+    final url = (images.isNotEmpty && images[0].toString().startsWith("http"))
+        ? images[0]
+        : null;
+
     final user = post["userId"];
+    final reward = post["rewardAmount"] ?? 0;
     final String userName =
         (post["isAnonymous"] == true) ? "Anonymous" : (user?["fullName"] ?? "Unknown");
-
-    final reward = post["rewardAmount"] ?? 0;
 
     return Card(
       elevation: 3,
@@ -296,33 +281,36 @@ class PostCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image (Reddit-style)
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: _buildImage(),
-          ),
+          url != null
+              ? _buildImage(url)
+              : Container(
+                  height: 200,
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(Icons.image_not_supported, size: 40),
+                  ),
+                ),
 
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // REWARD + LOST/FOUND ROW
+                // Reward + tag row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Reward
                     if (reward > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Color(0xFFFF8C32),
+                          color: const Color(0xFFFF8C32),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.attach_money_sharp, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
+                            const Icon(Icons.attach_money_sharp, color: Colors.white, size: 16),
+                            const SizedBox(width: 4),
                             Text(
                               "Reward: Rs. $reward",
                               style: const TextStyle(
@@ -334,15 +322,12 @@ class PostCard extends StatelessWidget {
                         ),
                       ),
 
-                    const SizedBox(width: 30),
-
-                    // LOST / FOUND tag
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: post["type"] == "lost"
                             ? Colors.redAccent
-                            : Color(0xFF2196F3),
+                            : const Color(0xFF2196F3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -350,7 +335,7 @@ class PostCard extends StatelessWidget {
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 12.0,
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -359,7 +344,6 @@ class PostCard extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                // Item Name
                 Text(
                   post["itemName"] ?? "Unnamed Item",
                   style: const TextStyle(
@@ -370,7 +354,6 @@ class PostCard extends StatelessWidget {
 
                 const SizedBox(height: 6),
 
-                // Description
                 Text(
                   post["description"] ?? "",
                   style: const TextStyle(color: Colors.black54),
@@ -378,23 +361,17 @@ class PostCard extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                // Location + User
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(Icons.location_on_outlined, size: 16),
                     const SizedBox(width: 4),
-
-                    // Wrapping Location
                     Expanded(
                       child: Text(
                         post["location"] ?? "Unknown",
                         softWrap: true,
                       ),
                     ),
-
                     const SizedBox(width: 8),
-
                     Text(
                       userName,
                       style: const TextStyle(
@@ -409,6 +386,5 @@ class PostCard extends StatelessWidget {
         ],
       ),
     );
-
   }
 }
