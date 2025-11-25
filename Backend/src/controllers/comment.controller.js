@@ -3,6 +3,7 @@ import { Post } from "../models/post.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { formatUserForAnonymous, ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js";
 
 // ============================================
 // ADD COMMENT OR REPLY
@@ -92,6 +93,9 @@ const addComment = asyncHandler(async (req, res) => {
 // ============================================
 // GET COMMENTS BY POST (Nested Structure)
 // ============================================
+
+
+// Replace the ENTIRE getCommentsByPost function (around line 65-180)
 const getCommentsByPost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const { page = 1, limit = 20 } = req.query;
@@ -135,17 +139,30 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
       const isReplyCurrentUser = 
         reply.userId._id.toString() === req.user._id.toString();
 
+      // CHECK IF THIS REPLY IS BY ANONYMOUS POST OWNER
+      const isAnonymousPostOwner = 
+        post.isAnonymous && 
+        reply.userId._id.toString() === post.userId.toString();
+
       const childReplies = await buildNestedReplies(reply._id);
 
       nestedReplies.push({
         commentId: reply.commentId,
-        user: {
-          _id: reply.userId._id,
-          fullName: reply.userId.fullName,
-          username: reply.userId.username,
-          profileImage: reply.userId.profileImage,
-          isPostOwner: isReplyPostOwner,
-        },
+        user: isAnonymousPostOwner 
+          ? {
+              _id: reply.userId._id,
+              fullName: reply.userId.username || reply.userId.fullName,
+              username: reply.userId.username,
+              profileImage: ANONYMOUS_PROFILE_PIC, // ANONYMOUS PIC
+              isPostOwner: isReplyPostOwner,
+            }
+          : {
+              _id: reply.userId._id,
+              fullName: reply.userId.fullName,
+              username: reply.userId.username,
+              profileImage: reply.userId.profileImage,
+              isPostOwner: isReplyPostOwner,
+            },
         content: reply.content,
         isEdited: reply.isEdited,
         createdAt: reply.createdAt,
@@ -166,17 +183,30 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
       const isCurrentUser =
         comment.userId._id.toString() === req.user._id.toString();
 
+      //  CHECK IF THIS COMMENT IS BY ANONYMOUS POST OWNER
+      const isAnonymousPostOwner = 
+        post.isAnonymous && 
+        comment.userId._id.toString() === post.userId.toString();
+
       const replies = await buildNestedReplies(comment._id);
 
       return {
         commentId: comment.commentId,
-        user: {
-          _id: comment.userId._id,
-          fullName: comment.userId.fullName,
-          username: comment.userId.username,
-          profileImage: comment.userId.profileImage,
-          isPostOwner,
-        },
+        user: isAnonymousPostOwner 
+          ? {
+              _id: comment.userId._id,
+              fullName: comment.userId.username || comment.userId.fullName,
+              username: comment.userId.username,
+              profileImage: ANONYMOUS_PROFILE_PIC, // ANONYMOUS PIC
+              isPostOwner,
+            }
+          : {
+              _id: comment.userId._id,
+              fullName: comment.userId.fullName,
+              username: comment.userId.username,
+              profileImage: comment.userId.profileImage,
+              isPostOwner,
+            },
         content: comment.content,
         isEdited: comment.isEdited,
         createdAt: comment.createdAt,
@@ -190,7 +220,7 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new ApiResponse(
       200,
-      {
+{
         comments: commentsWithReplies,
         pagination: {
           currentPage: parseInt(page),

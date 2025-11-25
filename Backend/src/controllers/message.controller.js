@@ -5,6 +5,7 @@ import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { getIO } from "../socket/socket.js"; 
+import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js"; // 
 import fs from "fs";
 
 // ============================================
@@ -22,7 +23,11 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid message type");
   }
 
-  const chat = await Chat.findOne({ chatId });
+  const chat = await Chat.findOne({ chatId }).populate({
+    path: "postId",
+    select: "isAnonymous userId", //  POPULATE POST DATA
+  });
+
   if (!chat) {
     throw new ApiError(404, "Chat not found");
   }
@@ -75,7 +80,23 @@ const sendMessage = asyncHandler(async (req, res) => {
       select: "fullName username email profileImage",
     });
 
-    // ===================== NEW SOCKET.IO BROADCAST =====================
+    // ============================================
+    //  FORMAT SENDER BASED ON ANONYMOUS STATUS
+    // ============================================
+    let senderName = populatedMessage.senderId.fullName;
+    let senderProfileImage = populatedMessage.senderId.profileImage;
+
+    // Check if post is anonymous and sender is the post owner
+    if (
+      chat.postId.isAnonymous &&
+      chat.postId.userId.toString() === populatedMessage.senderId._id.toString()
+    ) {
+      senderName = populatedMessage.senderId.username || populatedMessage.senderId.fullName;
+      senderProfileImage = ANONYMOUS_PROFILE_PIC; // USE ANONYMOUS PIC
+    }
+    // ============================================
+
+    // ===================== SOCKET.IO BROADCAST =====================
     try {
       const io = getIO();
       io.to(chat.chatId).emit("new_message", {
@@ -83,8 +104,8 @@ const sendMessage = asyncHandler(async (req, res) => {
         chatId: chat.chatId,
         sender: {
           _id: populatedMessage.senderId._id,
-          fullName: populatedMessage.senderId.fullName,
-          profileImage: populatedMessage.senderId.profileImage,
+          fullName: senderName, // FORMATTED NAME
+          profileImage: senderProfileImage, //  ANONYMOUS PIC IF NEEDED
         },
         content: populatedMessage.content,
         media: populatedMessage.media,
@@ -105,8 +126,8 @@ const sendMessage = asyncHandler(async (req, res) => {
           chatId: chat.chatId,
           sender: {
             _id: populatedMessage.senderId._id,
-            fullName: populatedMessage.senderId.fullName,
-            profileImage: populatedMessage.senderId.profileImage,
+            fullName: senderName, // FORMATTED NAME
+            profileImage: senderProfileImage, // ANONYMOUS PIC IF NEEDED
           },
           content: populatedMessage.content,
           media: populatedMessage.media,

@@ -8,10 +8,9 @@ import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { filterPostsByDistance } from "../utils/locationHelper.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
+import { formatPostWithAnonymous } from "../utils/userHelper.js"; 
 
-// ============================================
-// CREATE POST
-// ============================================
+
 // ============================================
 // CREATE POST
 // ============================================
@@ -238,16 +237,7 @@ const getAllPosts = asyncHandler(async (req, res) => {
   const paginatedPosts = finalPosts.slice(skip, skip + parseInt(limit));
 
   // Format response (hide user info if anonymous)
-  const formattedPosts = paginatedPosts.map((post) => {
-    const postObj = post.toObject ? post.toObject() : post;
-    if (postObj.isAnonymous) {
-      postObj.userId = {
-        username: postObj.userId.username,
-        profileImage: postObj.userId.profileImage,
-      };
-    }
-    return postObj;
-  });
+const formattedPosts = paginatedPosts.map((post) => formatPostWithAnonymous(post));
 
   return res.status(200).json(
     new ApiResponse(
@@ -281,13 +271,7 @@ const getPostById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Post not found");
   }
 
-  const postObj = post.toObject();
-  if (post.isAnonymous) {
-    postObj.userId = {
-      username: post.userId.username,
-      profileImage: post.userId.profileImage,
-    };
-  }
+const postObj = formatPostWithAnonymous(post);
 
   return res
     .status(200)

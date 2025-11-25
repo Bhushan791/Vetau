@@ -1,5 +1,6 @@
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
+import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js"; 
 
 export const handleChatEvents = (io, socket) => {
   
@@ -76,14 +77,20 @@ export const handleChatEvents = (io, socket) => {
         select: "fullName username profileImage",
       });
 
-      // Handle anonymous username
+      // ============================================
+      // ✅ FORMAT SENDER BASED ON ANONYMOUS STATUS
+      // ============================================
       let senderName = message.senderId.fullName;
+      let senderProfileImage = message.senderId.profileImage; // ✅ NEW
+
       if (
         chat.postId.isAnonymous &&
         chat.postId.userId.toString() === message.senderId._id.toString()
       ) {
         senderName = message.senderId.username || message.senderId.fullName;
+        senderProfileImage = ANONYMOUS_PROFILE_PIC; // ✅ USE ANONYMOUS PIC
       }
+      // ============================================
 
       const formattedMessage = {
         messageId: message.messageId,
@@ -91,7 +98,7 @@ export const handleChatEvents = (io, socket) => {
         sender: {
           _id: message.senderId._id,
           fullName: senderName,
-          profileImage: message.senderId.profileImage,
+          profileImage: senderProfileImage, // ✅ USE FORMATTED PROFILE IMAGE
         },
         content: message.content,
         media: message.media,

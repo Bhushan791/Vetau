@@ -4,7 +4,7 @@ import { Post } from "../models/post.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-
+import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js";
 // ============================================
 // GET MY CHATS
 // ============================================
@@ -36,37 +36,39 @@ const getMyChats = asyncHandler(async (req, res) => {
   });
 
   // Format response with anonymous username handling
-  const formattedChats = chats.map((chat) => {
-    const otherParticipant = chat.participants.find(
-      (p) => p._id.toString() !== req.user._id.toString()
-    );
+const formattedChats = chats.map((chat) => {
+  const otherParticipant = chat.participants.find(
+    (p) => p._id.toString() !== req.user._id.toString()
+  );
 
-    // Check if post was anonymous and other participant is the post owner
-    let displayName = otherParticipant.fullName;
-    if (
-      chat.postId.isAnonymous &&
-      chat.postId.userId.toString() === otherParticipant._id.toString()
-    ) {
-      displayName = otherParticipant.username || otherParticipant.fullName;
-    }
+  // Check if post was anonymous and other participant is the post owner
+  let displayName = otherParticipant.fullName;
+  let displayProfileImage = otherParticipant.profileImage; //  NEW
 
-    return {
-      chatId: chat.chatId,
-      postId: chat.postId.postId,
-      postType: chat.postId.type,
-      itemName: chat.postId.itemName,
-      postImage: chat.postId.images?.[0] || null,
-      otherParticipant: {
-        fullName: displayName,
-        email: otherParticipant.email,
-        profileImage: otherParticipant.profileImage,
-      },
-      lastMessage: chat.lastMessage,
-      lastMessageAt: chat.lastMessageAt,
-      createdAt: chat.createdAt,
-    };
-  });
+  if (
+    chat.postId.isAnonymous &&
+    chat.postId.userId.toString() === otherParticipant._id.toString()
+  ) {
+    displayName = otherParticipant.username || otherParticipant.fullName;
+    displayProfileImage = ANONYMOUS_PROFILE_PIC; //  ANONYMOUS PIC
+  }
 
+  return {
+    chatId: chat.chatId,
+    postId: chat.postId.postId,
+    postType: chat.postId.type,
+    itemName: chat.postId.itemName,
+    postImage: chat.postId.images?.[0] || null,
+    otherParticipant: {
+      fullName: displayName,
+      email: otherParticipant.email,
+      profileImage: displayProfileImage, //  USE ANONYMOUS PIC
+    },
+    lastMessage: chat.lastMessage,
+    lastMessageAt: chat.lastMessageAt,
+    createdAt: chat.createdAt,
+  };
+});
   return res.status(200).json(
     new ApiResponse(
       200,
@@ -120,24 +122,26 @@ const getChatById = asyncHandler(async (req, res) => {
   }
 
   // Format participants with anonymous username handling
-  const formattedParticipants = chat.participants.map((participant) => {
-    let displayName = participant.fullName;
+const formattedParticipants = chat.participants.map((participant) => {
+  let displayName = participant.fullName;
+  let displayProfileImage = participant.profileImage; //  NEW
 
-    // If post was anonymous and this participant is the post owner
-    if (
-      chat.postId.isAnonymous &&
-      chat.postId.userId.toString() === participant._id.toString()
-    ) {
-      displayName = participant.username || participant.fullName;
-    }
+  // If post was anonymous and this participant is the post owner
+  if (
+    chat.postId.isAnonymous &&
+    chat.postId.userId.toString() === participant._id.toString()
+  ) {
+    displayName = participant.username || participant.fullName;
+    displayProfileImage = ANONYMOUS_PROFILE_PIC; //  ANONYMOUS PIC
+  }
 
-    return {
-      _id: participant._id,
-      fullName: displayName,
-      email: participant.email,
-      profileImage: participant.profileImage,
-    };
-  });
+  return {
+    _id: participant._id,
+    fullName: displayName,
+    email: participant.email,
+    profileImage: displayProfileImage, // USE ANONYMOUS PIC
+  };
+});
 
   return res.status(200).json(
     new ApiResponse(
@@ -208,32 +212,34 @@ const getChatMessages = asyncHandler(async (req, res) => {
   );
 
   // Format messages with anonymous username handling
-  const formattedMessages = messages.map((msg) => {
-    let senderName = msg.senderId.fullName;
+const formattedMessages = messages.map((msg) => {
+  let senderName = msg.senderId.fullName;
+  let senderProfileImage = msg.senderId.profileImage; //  NEW
 
-    // If post was anonymous and sender is the post owner
-    if (
-      chat.postId.isAnonymous &&
-      chat.postId.userId.toString() === msg.senderId._id.toString()
-    ) {
-      senderName = msg.senderId.username || msg.senderId.fullName;
-    }
+  // If post was anonymous and sender is the post owner
+  if (
+    chat.postId.isAnonymous &&
+    chat.postId.userId.toString() === msg.senderId._id.toString()
+  ) {
+    senderName = msg.senderId.username || msg.senderId.fullName;
+    senderProfileImage = ANONYMOUS_PROFILE_PIC; //  ANONYMOUS PIC
+  }
 
-    return {
-      messageId: msg.messageId,
-      sender: {
-        _id: msg.senderId._id,
-        fullName: senderName,
-        profileImage: msg.senderId.profileImage,
-      },
-      content: msg.content,
-      media: msg.media,
-      messageType: msg.messageType,
-      isRead: msg.isRead,
-      createdAt: msg.createdAt,
-      isMine: msg.senderId._id.toString() === req.user._id.toString(),
-    };
-  });
+  return {
+    messageId: msg.messageId,
+    sender: {
+      _id: msg.senderId._id,
+      fullName: senderName,
+      profileImage: senderProfileImage, // USE ANONYMOUS PIC
+    },
+    content: msg.content,
+    media: msg.media,
+    messageType: msg.messageType,
+    isRead: msg.isRead,
+    createdAt: msg.createdAt,
+    isMine: msg.senderId._id.toString() === req.user._id.toString(),
+  };
+});
 
   return res.status(200).json(
     new ApiResponse(
