@@ -5,23 +5,14 @@ import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { filterPostsByDistance } from "../utils/locationHelper.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
-import path from "path"; 
-// ============================================
-// POST CONTROLLERS
-// ============================================
 
-/**
- * @desc    Create a new post (Lost or Found)
- * @route   POST /api/v1/posts
- * @access  Private
- */
+// ============================================
+// CREATE POST
+// ============================================
 const createPost = asyncHandler(async (req, res) => {
-  // Debug log
-// console.log("📦 Request body:", req.body);
-// console.log("📁 Files:", req.files);
-
   try {
     const {
       type,
@@ -35,10 +26,10 @@ const createPost = asyncHandler(async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!type || !itemName || !description || !category) {
+    if (!type || !itemName || !description || !category || !location) {
       throw new ApiError(
         400,
-        "Type, item name, description, and category are required"
+        "Type, item name, description, category, and location are required"
       );
     }
 
@@ -46,13 +37,8 @@ const createPost = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Type must be either 'lost' or 'found'");
     }
 
-    // Type-specific validation
     if (type === "lost" && !rewardAmount) {
       throw new ApiError(400, "Reward amount is required for lost posts");
-    }
-
-    if (type === "found" && !location) {
-      throw new ApiError(400, "Location is required for found posts");
     }
 
     if (type === "found" && (!req.files || req.files.length === 0)) {
@@ -62,15 +48,45 @@ const createPost = asyncHandler(async (req, res) => {
       );
     }
 
-    // Check if category exists
+    // Parse location (can be string or object)
+    let locationData;
+    if (typeof location === "string") {
+      try {
+        locationData = JSON.parse(location);
+      } catch {
+        // If not JSON, treat as plain text
+        locationData = { name: location, coordinates: null };
+      }
+    } else {
+      locationData = location;
+    }
+
+    // Validate location format
+    if (!locationData.name) {
+      throw new ApiError(400, "Location name is required");
+    }
+
+    // If coordinates provided, validate format
+    if (locationData.latitude && locationData.longitude) {
+      locationData.coordinates = [
+        parseFloat(locationData.longitude),
+        parseFloat(locationData.latitude),
+      ];
+    } else if (locationData.coordinates) {
+      // Already in [lng, lat] format
+      locationData.coordinates = locationData.coordinates;
+    } else {
+      // No coordinates (typed manually)
+      locationData.coordinates = null;
+    }
+
+    // Check category exists
     const categoryExists = await Category.findOne({
       name: category.toLowerCase(),
     });
-    
-  let finalCategory = categoryExists ? category.toLowerCase() : "other";
+    let finalCategory = categoryExists ? category.toLowerCase() : "other";
 
-
-    // If anonymous, check if user has username set
+    // Check username for anonymous posts
     if (isAnonymous) {
       const user = await User.findById(req.user._id);
       if (!user.username) {
@@ -81,7 +97,7 @@ const createPost = asyncHandler(async (req, res) => {
       }
     }
 
-    // Handle multiple image uploads to Cloudinary
+    // Upload images to Cloudinary
     const imageUrls = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
@@ -99,15 +115,17 @@ const createPost = asyncHandler(async (req, res) => {
       type,
       itemName,
       description,
-      location: location || "",
+      location: {
+        name: locationData.name,
+        coordinates: locationData.coordinates,
+      },
       images: imageUrls,
       rewardAmount: rewardAmount || 0,
       isAnonymous: isAnonymous || false,
-      category: category.toLowerCase(),
+      category: finalCategory,
       tags: tags || [],
     });
 
-    // Populate user info
     const populatedPost = await Post.findById(post._id).populate(
       "userId",
       "fullName username email profileImage"
@@ -117,33 +135,32 @@ const createPost = asyncHandler(async (req, res) => {
       .status(201)
       .json(new ApiResponse(201, populatedPost, "Post created successfully"));
   } catch (error) {
-    // Clean up ALL temp files on ANY error
     if (req.files && req.files.length > 0) {
       req.files.forEach((file) => {
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
-          console.log("🗑️ Temp file cleaned up after error:", file.path);
         }
       });
     }
-
-    // Re-throw the error so asyncHandler can handle it
     throw error;
   }
 });
 
-/**
- * @desc    Get all posts with filters
- * @route   GET /api/v1/posts
- * @access  Public
- */
+// ============================================
+// GET ALL POSTS WITH FILTERS
+// ============================================
 const getAllPosts = asyncHandler(async (req, res) => {
   const {
     type,
     category,
+    categories, // NEW: Multiple categories (comma-separated)
     status,
     search,
-    location,
+    nearMe,
+    latitude,
+    longitude,
+    radius = 7,
+    highReward, // NEW: Filter rewards >= 2000
     page = 1,
     limit = 10,
   } = req.query;
@@ -151,12 +168,27 @@ const getAllPosts = asyncHandler(async (req, res) => {
   // Build filter
   const filter = {};
 
+  // Type filter
   if (type) filter.type = type;
-  if (category) filter.category = category.toLowerCase();
-  if (status) filter.status = status;
-  if (location) filter.location = { $regex: location, $options: "i" };
 
-  // Search by item name or description
+  // Single category filter
+  if (category) filter.category = category.toLowerCase();
+
+  // Multiple categories filter
+  if (categories) {
+    const categoryArray = categories.split(",").map((c) => c.toLowerCase());
+    filter.category = { $in: categoryArray };
+  }
+
+  // Status filter
+  if (status) filter.status = status;
+
+  // High reward filter
+  if (highReward === "true") {
+    filter.rewardAmount = { $gte: 2000 };
+  }
+
+  // Keyword search (item name, description, tags)
   if (search) {
     filter.$or = [
       { itemName: { $regex: search, $options: "i" } },
@@ -165,24 +197,34 @@ const getAllPosts = asyncHandler(async (req, res) => {
     ];
   }
 
-  // Pagination
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-
+  // Fetch posts
   const posts = await Post.find(filter)
     .populate("userId", "fullName username email profileImage")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit));
+    .sort({ createdAt: -1 });
 
-  const totalPosts = await Post.countDocuments(filter);
+  let finalPosts = posts;
 
-  // Format response - hide user info if anonymous
-  const formattedPosts = posts.map((post) => {
-    const postObj = post.toObject();
-    if (post.isAnonymous) {
+  // Near Me filter (TURF.js)
+  if (nearMe === "true" && latitude && longitude) {
+    const userLat = parseFloat(latitude);
+    const userLng = parseFloat(longitude);
+    const searchRadius = parseFloat(radius);
+
+    // Filter posts within radius
+    finalPosts = filterPostsByDistance(posts, userLat, userLng, searchRadius);
+  }
+
+  // Pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const paginatedPosts = finalPosts.slice(skip, skip + parseInt(limit));
+
+  // Format response (hide user info if anonymous)
+  const formattedPosts = paginatedPosts.map((post) => {
+    const postObj = post.toObject ? post.toObject() : post;
+    if (postObj.isAnonymous) {
       postObj.userId = {
-        username: post.userId.username,
-        profileImage: post.userId.profileImage,
+        username: postObj.userId.username,
+        profileImage: postObj.userId.profileImage,
       };
     }
     return postObj;
@@ -195,9 +237,9 @@ const getAllPosts = asyncHandler(async (req, res) => {
         posts: formattedPosts,
         pagination: {
           currentPage: parseInt(page),
-          totalPages: Math.ceil(totalPosts / parseInt(limit)),
-          totalPosts,
-          hasMore: skip + posts.length < totalPosts,
+          totalPages: Math.ceil(finalPosts.length / parseInt(limit)),
+          totalPosts: finalPosts.length,
+          hasMore: skip + paginatedPosts.length < finalPosts.length,
         },
       },
       "Posts fetched successfully"
@@ -205,14 +247,10 @@ const getAllPosts = asyncHandler(async (req, res) => {
   );
 });
 
-/**
- * @desc    Get single post by ID
- * @route   GET /api/v1/posts/:postId
- * @access  Public
- */
+// ============================================
+// GET POST BY ID
+// ============================================
 const getPostById = asyncHandler(async (req, res) => {
-  console.log("Requested postId:", req.params.postId);
-
   const { postId } = req.params;
 
   const post = await Post.findOne({ postId }).populate(
@@ -224,7 +262,6 @@ const getPostById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Post not found");
   }
 
-  // Format response - hide user info if anonymous
   const postObj = post.toObject();
   if (post.isAnonymous) {
     postObj.userId = {
@@ -238,20 +275,16 @@ const getPostById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, postObj, "Post fetched successfully"));
 });
 
-/**
- * @desc    Get current user's posts
- * @route   GET /api/v1/posts/my-posts
- * @access  Private
- */
+// ============================================
+// GET MY POSTS
+// ============================================
 const getMyPosts = asyncHandler(async (req, res) => {
   const { type, status, page = 1, limit = 10 } = req.query;
 
-  // Build filter
   const filter = { userId: req.user._id };
   if (type) filter.type = type;
   if (status) filter.status = status;
 
-  // Pagination
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const posts = await Post.find(filter)
@@ -279,35 +312,59 @@ const getMyPosts = asyncHandler(async (req, res) => {
   );
 });
 
-/**
- * @desc    Update post
- * @route   PATCH /api/v1/posts/:postId
- * @access  Private
- */
+// ============================================
+// UPDATE POST
+// ============================================
 const updatePost = asyncHandler(async (req, res) => {
   try {
     const { postId } = req.params;
     const { description, location, rewardAmount, tags } = req.body;
 
-    // Find post
     const post = await Post.findOne({ postId });
 
     if (!post) {
       throw new ApiError(404, "Post not found");
     }
 
-    // Check ownership
     if (post.userId.toString() !== req.user._id.toString()) {
       throw new ApiError(403, "You are not authorized to update this post");
     }
 
     // Update fields
     if (description) post.description = description;
-    if (location) post.location = location;
     if (rewardAmount !== undefined) post.rewardAmount = rewardAmount;
     if (tags) post.tags = tags;
 
-    // Handle new images upload if provided
+    // Update location if provided
+    if (location) {
+      let locationData;
+      if (typeof location === "string") {
+        try {
+          locationData = JSON.parse(location);
+        } catch {
+          locationData = { name: location, coordinates: null };
+        }
+      } else {
+        locationData = location;
+      }
+
+      if (locationData.latitude && locationData.longitude) {
+        post.location = {
+          name: locationData.name,
+          coordinates: [
+            parseFloat(locationData.longitude),
+            parseFloat(locationData.latitude),
+          ],
+        };
+      } else {
+        post.location = {
+          name: locationData.name,
+          coordinates: locationData.coordinates || null,
+        };
+      }
+    }
+
+    // Handle new images
     if (req.files && req.files.length > 0) {
       const imageUrls = [];
       for (const file of req.files) {
@@ -316,7 +373,6 @@ const updatePost = asyncHandler(async (req, res) => {
           imageUrls.push(cloudResp.secure_url);
         }
       }
-      // Append new images to existing ones
       post.images = [...post.images, ...imageUrls];
     }
 
@@ -331,26 +387,20 @@ const updatePost = asyncHandler(async (req, res) => {
       .status(200)
       .json(new ApiResponse(200, updatedPost, "Post updated successfully"));
   } catch (error) {
-    // Clean up ALL temp files on ANY error
     if (req.files && req.files.length > 0) {
       req.files.forEach((file) => {
         if (file.path && fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
-          console.log("🗑️ Temp file cleaned up after error:", file.path);
         }
       });
     }
-
-    // Re-throw the error
     throw error;
   }
 });
 
-/**
- * @desc    Update post status
- * @route   PATCH /api/v1/posts/:postId/status
- * @access  Private
- */
+// ============================================
+// UPDATE POST STATUS
+// ============================================
 const updatePostStatus = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const { status } = req.body;
@@ -362,14 +412,12 @@ const updatePostStatus = asyncHandler(async (req, res) => {
     );
   }
 
-  // Find post
   const post = await Post.findOne({ postId });
 
   if (!post) {
     throw new ApiError(404, "Post not found");
   }
 
-  // Check ownership
   if (post.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "You are not authorized to update this post");
   }
@@ -382,22 +430,18 @@ const updatePostStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, post, "Post status updated successfully"));
 });
 
-/**
- * @desc    Delete post
- * @route   DELETE /api/v1/posts/:postId
- * @access  Private
- */
+// ============================================
+// DELETE POST
+// ============================================
 const deletePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
 
-  // Find post
   const post = await Post.findOne({ postId });
 
   if (!post) {
     throw new ApiError(404, "Post not found");
   }
 
-  // Check ownership
   if (post.userId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "You are not authorized to delete this post");
   }
@@ -408,10 +452,6 @@ const deletePost = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, {}, "Post deleted successfully"));
 });
-
-// ============================================
-// EXPORTS
-// ============================================
 
 export {
   createPost,
