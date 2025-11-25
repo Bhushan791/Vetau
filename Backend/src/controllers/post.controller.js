@@ -12,6 +12,9 @@ import fs from "fs";
 // ============================================
 // CREATE POST
 // ============================================
+// ============================================
+// CREATE POST
+// ============================================
 const createPost = asyncHandler(async (req, res) => {
   try {
     const {
@@ -80,11 +83,28 @@ const createPost = asyncHandler(async (req, res) => {
       locationData.coordinates = null;
     }
 
-    // Check category exists
-    const categoryExists = await Category.findOne({
-      name: category.toLowerCase(),
+    // ============================================
+    // AUTO-CREATE CATEGORY IF IT DOESN'T EXIST
+    // ============================================
+    const categoryLower = category.toLowerCase().trim();
+    
+    let categoryExists = await Category.findOne({
+      name: categoryLower,
     });
-    let finalCategory = categoryExists ? category.toLowerCase() : "other";
+
+    // If category doesn't exist, create it automatically
+    if (!categoryExists) {
+      categoryExists = await Category.create({
+        categoryId: uuidv4(),
+        name: categoryLower,
+        description: `User-created category: ${categoryLower}`,
+        icon: "",
+        isActive: true,
+      });
+    }
+
+    const finalCategory = categoryLower;
+    // ============================================
 
     // Check username for anonymous posts
     if (isAnonymous) {
@@ -145,7 +165,6 @@ const createPost = asyncHandler(async (req, res) => {
     throw error;
   }
 });
-
 // ============================================
 // GET ALL POSTS WITH FILTERS
 // ============================================
