@@ -29,53 +29,22 @@ const addComment = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Post not found");
   }
 
-  const isPostOwner = post.userId.toString() === req.user._id.toString();
-
   let parentCommentObjectId = null;
-  let rootCommentObjectId = null;
 
   // Handle reply logic
   if (parentCommentId) {
-    const parentComment = await Comment.findOne({ commentId: parentCommentId })
-      .populate("postId")
-      .populate("userId");
+    const parentComment = await Comment.findOne({ commentId: parentCommentId });
 
     if (!parentComment) {
       throw new ApiError(404, "Parent comment not found");
     }
 
     // Check if parent comment belongs to the same post
-    if (parentComment.postId._id.toString() !== post._id.toString()) {
+    if (parentComment.postId.toString() !== post._id.toString()) {
       throw new ApiError(400, "Parent comment does not belong to this post");
     }
 
-    // Find the root comment (start of the thread)
-    const rootComment = parentComment.rootCommentId
-      ? await Comment.findById(parentComment.rootCommentId).populate("userId")
-      : parentComment;
-
-    // Authorization Logic:
-    // 1. If root comment is by post owner -> Anyone can reply (edge case)
-    // 2. Otherwise -> Only post owner and the root commentor can participate
-    const isRootCommentByPostOwner = 
-      rootComment.userId._id.toString() === post.userId.toString();
-
-    if (!isRootCommentByPostOwner) {
-      // Normal case: Only post owner OR root commentor can participate
-      const isRootCommentor = 
-        rootComment.userId._id.toString() === req.user._id.toString();
-
-      if (!isPostOwner && !isRootCommentor) {
-        throw new ApiError(
-          403,
-          "Only post owner and the original commentor can participate in this conversation"
-        );
-      }
-    }
-    // If root comment is by post owner, anyone can reply (no restriction)
-
     parentCommentObjectId = parentComment._id;
-    rootCommentObjectId = rootComment._id;
   }
 
   // Create comment
@@ -84,7 +53,6 @@ const addComment = asyncHandler(async (req, res) => {
     userId: req.user._id,
     content: content.trim(),
     parentCommentId: parentCommentObjectId,
-    rootCommentId: rootCommentObjectId, // null for root comments
   });
 
   // Increment post's totalComments counter
@@ -157,7 +125,7 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
       parentCommentId: commentId,
     })
       .populate("userId", "fullName username profileImage")
-      .sort({ createdAt: 1 }); // Oldest first (chronological)
+      .sort({ createdAt: 1 });
 
     const nestedReplies = [];
     
@@ -198,16 +166,6 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
       const isCurrentUser =
         comment.userId._id.toString() === req.user._id.toString();
 
-      // Determine who can reply based on thread rules
-      let canReply = false;
-      if (isPostOwner) {
-        // If root comment is by post owner, anyone can reply
-        canReply = true;
-      } else {
-        // Normal case: Only post owner or the root commentor can reply
-        canReply = isCurrentUser || post.userId.toString() === req.user._id.toString();
-      }
-
       const replies = await buildNestedReplies(comment._id);
 
       return {
@@ -222,7 +180,6 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
         content: comment.content,
         isEdited: comment.isEdited,
         createdAt: comment.createdAt,
-        canReply,
         canEdit: isCurrentUser,
         canDelete: isCurrentUser,
         replies,
@@ -341,11 +298,11 @@ const deleteComment = asyncHandler(async (req, res) => {
         200,
         {
           deletedCommentId: commentId,
-          totalDeleted: totalDeleted - 1, // Exclude the comment itself
+          totalDeleted: totalDeleted - 1,
         },
         "Comment deleted successfully"
       )
     );
 });
 
-export { addComment, getCommentsByPost, updateComment, deleteComment };
+export { addComment, getCommentsByPost, updateComment, deleteComment }; 

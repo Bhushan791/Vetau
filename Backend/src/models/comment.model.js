@@ -34,13 +34,7 @@ const commentSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    // Track the root comment to identify conversation threads
-    rootCommentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Comment",
-      default: null,
-      index: true,
-    },
+
     isEdited: {
       type: Boolean,
       default: false,
