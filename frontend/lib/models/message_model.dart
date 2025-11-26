@@ -24,12 +24,13 @@ class MessageModel {
   });
 
   /// PARSING BACKEND JSON
-  factory MessageModel.fromJson(Map<String, dynamic> json) {
+  factory MessageModel.fromJson(Map<String, dynamic> json, {String? currentUserId}) {
     final sender = json["sender"] ?? {};
+    final senderId = sender["_id"]?.toString() ?? "";
 
     return MessageModel(
       messageId: json["messageId"].toString(),
-      senderId: sender["_id"]?.toString() ?? "",
+      senderId: senderId,
       senderName: sender["fullName"] ?? "",
       senderImage: sender["profileImage"] ?? "",
       content: json["content"] ?? "",
@@ -39,7 +40,7 @@ class MessageModel {
       messageType: json["messageType"] ?? "text",
       isRead: json["isRead"] ?? false,
       createdAt: DateTime.tryParse(json["createdAt"] ?? "") ?? DateTime.now(),
-      isMine: json["isMine"] ?? false,
+      isMine: currentUserId != null ? senderId == currentUserId : (json["isMine"] ?? false),
     );
   }
 

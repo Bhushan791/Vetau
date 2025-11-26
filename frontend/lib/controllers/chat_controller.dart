@@ -30,6 +30,8 @@ class ChatController {
   /// LOAD FIRST PAGE
   /// ---------------------------
   Future<void> loadInitialMessages() async {
+    final currentUserId = await _getCurrentUserId();
+    
     final response = await _client.get(
       Uri.parse("https://vetau.onrender.com/api/v1/chats/$roomId/messages"),
     );
@@ -38,7 +40,7 @@ class ChatController {
     final List messagesJson = jsonBody["data"]["messages"];
 
     final messages =
-        messagesJson.map((m) => MessageModel.fromJson(m)).toList();
+        messagesJson.map((m) => MessageModel.fromJson(m, currentUserId: currentUserId)).toList();
 
     ref.read(chatMessagesProvider(roomId).notifier).setMessages(messages);
   }
@@ -47,6 +49,8 @@ class ChatController {
   /// LOAD OLDER MESSAGES
   /// ---------------------------
   Future<void> loadMoreMessages(int page) async {
+    final currentUserId = await _getCurrentUserId();
+    
     final response = await _client.get(
       Uri.parse(
           "https://vetau.onrender.com/api/v1/chats/$roomId/messages?page=$page"),
@@ -55,7 +59,7 @@ class ChatController {
     final jsonBody = jsonDecode(response.body);
     final List messagesJson = jsonBody["data"]["messages"];
 
-    final older = messagesJson.map((m) => MessageModel.fromJson(m)).toList();
+    final older = messagesJson.map((m) => MessageModel.fromJson(m, currentUserId: currentUserId)).toList();
 
     ref.read(chatMessagesProvider(roomId).notifier).insertOlderMessages(older);
   }
@@ -64,7 +68,7 @@ class ChatController {
   /// SEND MESSAGE
   /// ---------------------------
   Future<void> sendMessage(String content) async {
-    // Only send via socket - backend handles both persistence and real-time
+    // Send via socket - backend will broadcast to all participants including sender
     SocketService.instance.sendMessage(roomId, content);
   }
 
@@ -92,33 +96,34 @@ class ChatController {
     // Clear existing listeners to prevent duplicates
     socketService.clearListeners();
 
-    // Listen for new messages (from others)
+    // Listen for messages from others
     socketService.onNewMessage((data) {
+      print('📨 Received new_message: chatId=${data['chatId']}, currentRoom=$roomId');
+      if (data['chatId']?.toString() != roomId) return;
+      
       final message = MessageModel.fromBackendSocket(data, currentUserId: currentUserId);
       ref.read(chatMessagesProvider(roomId).notifier).addMessage(message);
-      
-      // Update last message in chats list
       ref.read(chatsProvider.notifier).updateLastMessage(roomId, message.content);
     });
 
-    // Listen for message sent confirmation (my messages)
+    // Listen for my sent messages confirmation
     socketService.onMessageSent((data) {
+      print('📨 Received message_sent: chatId=${data['chatId']}, currentRoom=$roomId');
+      if (data['chatId']?.toString() != roomId) return;
+      
       final message = MessageModel.fromBackendSocket(data, currentUserId: currentUserId);
       ref.read(chatMessagesProvider(roomId).notifier).addMessage(message);
-      
-      // Update last message in chats list
       ref.read(chatsProvider.notifier).updateLastMessage(roomId, message.content);
-      print('✅ Message sent successfully');
     });
 
     // Listen for typing indicators
     socketService.onUserTyping((data) {
-      // Handle typing indicator
+      if (data['chatId']?.toString() != roomId) return;
       print('📝 ${data['fullName']} is typing...');
     });
 
     socketService.onUserStopTyping((data) {
-      // Handle stop typing
+      if (data['chatId']?.toString() != roomId) return;
       print('📝 Stopped typing');
     });
 

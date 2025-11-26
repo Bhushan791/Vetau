@@ -52,14 +52,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       await chatController.initSocketListeners();
       print('🔧 Socket listeners initialized');
       
-      // Listen for typing indicators
+      // Listen for typing indicators - FILTERED BY ROOM ID
       SocketService.instance.onUserTyping((data) {
+        if (data['chatId']?.toString() != widget.chatId) return;
         setState(() {
           typingUser = data['fullName'] ?? 'Someone';
         });
       });
       
       SocketService.instance.onUserStopTyping((data) {
+        if (data['chatId']?.toString() != widget.chatId) return;
         setState(() {
           typingUser = '';
         });
