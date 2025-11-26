@@ -82,6 +82,15 @@ class _SearchPageState extends State<SearchPage> {
                               hintText: "Search for lost pets, services...",
                               border: InputBorder.none,
                             ),
+                            onSubmitted: (value) {
+                              if (value.trim().isNotEmpty) {
+                                Navigator.pushNamed(
+                                  context,
+                                  '/search_results',
+                                  arguments: value.trim(),
+                                );
+                              }
+                            },
                           ),
                         ),
                       ],

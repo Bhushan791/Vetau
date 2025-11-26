@@ -10,6 +10,7 @@ import 'package:frontend/pages/login.dart';
 import 'package:frontend/pages/register.dart';
 import 'package:frontend/pages/home.dart';
 import 'package:frontend/pages/search.dart';
+import 'package:frontend/pages/search_results.dart';
 import 'package:frontend/pages/chat/all_chats.dart';
 import 'package:frontend/pages/more.dart';
 import 'package:frontend/pages/post.dart';
@@ -78,6 +79,15 @@ class MyApp extends StatelessWidget {
 
           return MaterialPageRoute(
             builder: (_) => ChatPage(chatId: chatId),
+          );
+        }
+
+        // For opening search results with query
+        if (settings.name == '/search_results') {
+          final String searchQuery = settings.arguments as String;
+
+          return MaterialPageRoute(
+            builder: (_) => SearchResults(searchQuery: searchQuery),
           );
         }
 
