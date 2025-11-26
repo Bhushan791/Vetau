@@ -15,7 +15,6 @@ import brevo from '@getbrevo/brevo';
 // HELPER FUNCTIONS
 // ============================================
 
-
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -72,8 +71,6 @@ const sendOTPEmail = async (email, otp, purpose = "password reset") => {
     throw new Error('Failed to send OTP email');
   }
 };
-
-
 
 // ============================================
 // AUTHENTICATION CONTROLLERS
@@ -266,27 +263,18 @@ const googleAuth = passport.authenticate("google", {
   scope: ["profile", "email"],
 });
 
-// Google OAuth Callback
 const googleAuthCallback = [
   passport.authenticate("google", { 
     session: false, 
     failureRedirect: "http://localhost:3000/login?error=auth_failed" 
   }),
   asyncHandler(async (req, res) => {
-    // Generate tokens for the authenticated user
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(req.user._id);
-
-    // Get user data
     const user = await User.findById(req.user._id).select("-password -refreshToken");
-
-    // Redirect to frontend with tokens (change URL based on your frontend)
-    // const redirectUrl = `http://localhost:3000/auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`;
-    
-    // res.redirect(redirectUrl);
-
     return res.redirect(`vetau://auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&userId=${user._id}`);
   }),
 ];
+
 // ============================================
 // PROFILE MANAGEMENT
 // ============================================
@@ -308,7 +296,6 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
   if (fullName) updateFields.fullName = fullName;
   if (address) updateFields.address = address;
   if (username) {
-    // Check if username already exists
     const existingUser = await User.findOne({ 
       username: username.toLowerCase(),
       _id: { $ne: req.user._id } 
@@ -440,12 +427,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
   try {
     await sendOTPEmail(email, otp, "password reset");
   } catch (error) {
-    console.error("EMAIL ERROR DETAILS:", error); // This logs to Render
+    console.error("EMAIL ERROR DETAILS:", error);
     user.passwordResetOTP = undefined;
     user.passwordResetOTPExpiry = undefined;
     await user.save({ validateBeforeSave: false });
-    
-    // CHANGED: Show actual error to you
     throw new ApiError(500, `Email send failed: ${error.message}`);
   }
 
@@ -518,7 +503,25 @@ const resetPasswordWithOTP = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Password reset successfully. You can now login."));
 });
 
+// ============================================
+// 🔔 FCM TOKEN MANAGEMENT (NEW)
+// ============================================
 
+const saveFCMToken = asyncHandler(async (req, res) => {
+  const { fcmToken } = req.body;
+
+  if (!fcmToken) {
+    throw new ApiError(400, "FCM token is required");
+  }
+
+  const user = await User.findById(req.user._id);
+  user.fcmToken = fcmToken;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "FCM token saved successfully"));
+});
 
 // ============================================
 // EXPORTS
@@ -539,5 +542,5 @@ export {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
-
+  saveFCMToken, // 🆕 NEW EXPORT
 };

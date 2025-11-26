@@ -1,11 +1,13 @@
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
+import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { getIO } from "../socket/socket.js"; 
-import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js"; // 
+import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js";
+import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 NEW IMPORT
 import fs from "fs";
 
 // ============================================
@@ -25,7 +27,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   const chat = await Chat.findOne({ chatId }).populate({
     path: "postId",
-    select: "isAnonymous userId", //  POPULATE POST DATA
+    select: "isAnonymous userId",
   });
 
   if (!chat) {
@@ -81,7 +83,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     });
 
     // ============================================
-    //  FORMAT SENDER BASED ON ANONYMOUS STATUS
+    // FORMAT SENDER BASED ON ANONYMOUS STATUS
     // ============================================
     let senderName = populatedMessage.senderId.fullName;
     let senderProfileImage = populatedMessage.senderId.profileImage;
@@ -92,7 +94,38 @@ const sendMessage = asyncHandler(async (req, res) => {
       chat.postId.userId.toString() === populatedMessage.senderId._id.toString()
     ) {
       senderName = populatedMessage.senderId.username || populatedMessage.senderId.fullName;
-      senderProfileImage = ANONYMOUS_PROFILE_PIC; // USE ANONYMOUS PIC
+      senderProfileImage = ANONYMOUS_PROFILE_PIC;
+    }
+    // ============================================
+
+    // ============================================
+    // 🔔 SEND PUSH NOTIFICATION TO OTHER USER (NEW)
+    // ============================================
+    // Get other participant
+    const otherParticipantId = chat.participants.find(
+      (p) => p.toString() !== req.user._id.toString()
+    );
+
+    const otherUser = await User.findById(otherParticipantId);
+
+    if (otherUser && otherUser.fcmToken) {
+      try {
+        await sendPushNotification(
+          otherUser.fcmToken,
+          {
+            title: senderName, // Use formatted name (anonymous if needed)
+            body: messageType === "text" ? content : "📷 Sent an image",
+          },
+          {
+            type: "message",
+            chatId: chat.chatId,
+            messageId: message.messageId,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to send message notification:", error);
+        // Don't throw error, notification failure shouldn't block message sending
+      }
     }
     // ============================================
 
@@ -104,8 +137,8 @@ const sendMessage = asyncHandler(async (req, res) => {
         chatId: chat.chatId,
         sender: {
           _id: populatedMessage.senderId._id,
-          fullName: senderName, // FORMATTED NAME
-          profileImage: senderProfileImage, //  ANONYMOUS PIC IF NEEDED
+          fullName: senderName,
+          profileImage: senderProfileImage,
         },
         content: populatedMessage.content,
         media: populatedMessage.media,
@@ -126,8 +159,8 @@ const sendMessage = asyncHandler(async (req, res) => {
           chatId: chat.chatId,
           sender: {
             _id: populatedMessage.senderId._id,
-            fullName: senderName, // FORMATTED NAME
-            profileImage: senderProfileImage, // ANONYMOUS PIC IF NEEDED
+            fullName: senderName,
+            profileImage: senderProfileImage,
           },
           content: populatedMessage.content,
           media: populatedMessage.media,
@@ -149,7 +182,6 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw error;
   }
 });
-
 
 // ============================================
 // MARK MESSAGES AS READ

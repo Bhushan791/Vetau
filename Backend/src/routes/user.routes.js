@@ -14,10 +14,12 @@ import {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
+  saveFCMToken
    
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+
 
 const router = Router();
 
@@ -142,5 +144,7 @@ router.route("/change-password").post(verifyJWT, changeCurrentPassword);
  * @access  Private
  */
 router.route("/delete-account").delete(verifyJWT, deleteAccount);
+
+router.post("/fcm-token", verifyJWT, saveFCMToken);
 
 export default router;

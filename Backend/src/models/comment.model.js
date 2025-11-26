@@ -8,6 +8,7 @@ const commentSchema = new mongoose.Schema(
       default: () => uuidv4(),
       unique: true,
       required: true,
+      index: true, // REMOVED DUPLICATE - kept only this one
     },
     postId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -32,7 +33,7 @@ const commentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
       default: null,
-      index: true,
+      index: true, // REMOVED DUPLICATE - kept only this one
     },
 
     isEdited: {
@@ -47,8 +48,8 @@ const commentSchema = new mongoose.Schema(
 
 // Indexes for faster queries
 commentSchema.index({ postId: 1, createdAt: -1 });
-commentSchema.index({ parentCommentId: 1 });
-commentSchema.index({ rootCommentId: 1 });
-commentSchema.index({ commentId: 1 });
+// REMOVED: commentSchema.index({ parentCommentId: 1 }); - already defined above
+// REMOVED: commentSchema.index({ rootCommentId: 1 }); - field doesn't exist in schema
+// REMOVED: commentSchema.index({ commentId: 1 }); - already defined above
 
 export const Comment = mongoose.model("Comment", commentSchema);

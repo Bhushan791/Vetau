@@ -1,9 +1,11 @@
 import { Comment } from "../models/comment.model.js";
 import { Post } from "../models/post.model.js";
+import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { formatUserForAnonymous, ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js";
+import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 NEW IMPORT
 
 // ============================================
 // ADD COMMENT OR REPLY
@@ -60,6 +62,35 @@ const addComment = asyncHandler(async (req, res) => {
   post.totalComments = (post.totalComments || 0) + 1;
   await post.save();
 
+  // ============================================
+  // 🔔 SEND NOTIFICATION TO POST OWNER (NEW)
+  // ============================================
+  // Only notify if commenter is NOT the post owner
+  if (post.userId.toString() !== req.user._id.toString()) {
+    const postOwner = await User.findById(post.userId);
+    
+    if (postOwner && postOwner.fcmToken) {
+      try {
+        await sendPushNotification(
+          postOwner.fcmToken,
+          {
+            title: "New Comment",
+            body: `${req.user.fullName} commented on your post`,
+          },
+          {
+            type: "comment",
+            postId: post.postId,
+            commentId: comment.commentId,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to send comment notification:", error);
+        // Don't throw error, notification failure shouldn't block comment creation
+      }
+    }
+  }
+  // ============================================
+
   // Populate user details
   const populatedComment = await Comment.findById(comment._id).populate(
     "userId",
@@ -94,8 +125,6 @@ const addComment = asyncHandler(async (req, res) => {
 // GET COMMENTS BY POST (Nested Structure)
 // ============================================
 
-
-// Replace the ENTIRE getCommentsByPost function (around line 65-180)
 const getCommentsByPost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
   const { page = 1, limit = 20 } = req.query;
@@ -153,7 +182,7 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
               _id: reply.userId._id,
               fullName: reply.userId.username || reply.userId.fullName,
               username: reply.userId.username,
-              profileImage: ANONYMOUS_PROFILE_PIC, // ANONYMOUS PIC
+              profileImage: ANONYMOUS_PROFILE_PIC,
               isPostOwner: isReplyPostOwner,
             }
           : {
@@ -183,7 +212,6 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
       const isCurrentUser =
         comment.userId._id.toString() === req.user._id.toString();
 
-      //  CHECK IF THIS COMMENT IS BY ANONYMOUS POST OWNER
       const isAnonymousPostOwner = 
         post.isAnonymous && 
         comment.userId._id.toString() === post.userId.toString();
@@ -197,7 +225,7 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
               _id: comment.userId._id,
               fullName: comment.userId.username || comment.userId.fullName,
               username: comment.userId.username,
-              profileImage: ANONYMOUS_PROFILE_PIC, // ANONYMOUS PIC
+              profileImage: ANONYMOUS_PROFILE_PIC,
               isPostOwner,
             }
           : {
@@ -220,7 +248,7 @@ const getCommentsByPost = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new ApiResponse(
       200,
-{
+      {
         comments: commentsWithReplies,
         pagination: {
           currentPage: parseInt(page),
@@ -335,4 +363,4 @@ const deleteComment = asyncHandler(async (req, res) => {
     );
 });
 
-export { addComment, getCommentsByPost, updateComment, deleteComment }; 
+export { addComment, getCommentsByPost, updateComment, deleteComment };

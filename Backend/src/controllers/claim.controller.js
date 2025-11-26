@@ -1,15 +1,16 @@
 import { Claim } from "../models/claim.model.js";
 import { Post } from "../models/post.model.js";
+import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Chat } from "../models/chat.model.js";
 import { v4 as uuidv4 } from "uuid";
+import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 NEW IMPORT
 
 // ============================================
 // CLAIM CONTROLLERS
 // ============================================
-
 
 // Creates a new claim on a post by a user
 const createClaim = asyncHandler(async (req, res) => {
@@ -62,6 +63,32 @@ const createClaim = asyncHandler(async (req, res) => {
   // Increment post's totalClaims counter
   post.totalClaims += 1;
   await post.save();
+
+  // ============================================
+  // 🔔 SEND NOTIFICATION TO POST OWNER (NEW)
+  // ============================================
+  const postOwner = await User.findById(post.userId);
+
+  if (postOwner && postOwner.fcmToken) {
+    try {
+      await sendPushNotification(
+        postOwner.fcmToken,
+        {
+          title: "New Claim",
+          body: `${req.user.fullName} claimed your ${post.type} post`,
+        },
+        {
+          type: "claim",
+          postId: post.postId,
+          claimId: claim.claimId,
+        }
+      );
+    } catch (error) {
+      console.error("Failed to send claim notification:", error);
+      // Don't throw error, notification failure shouldn't block claim creation
+    }
+  }
+  // ============================================
 
   // Populate claim with user and post details
   const populatedClaim = await Claim.findById(claim._id)
@@ -234,9 +261,7 @@ const getClaimsOnMyPosts = asyncHandler(async (req, res) => {
   );
 });
 
-
-// Updates a claim’s status (accept/reject) by the post owner
-
+// Updates a claim's status (accept/reject) by the post owner
 const updateClaimStatus = asyncHandler(async (req, res) => {
   const { claimId } = req.params;
   const { status } = req.body;
@@ -272,14 +297,15 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
     post.status = "claimed";
     await post.save();
 
-    // ✅ CREATE CHAT SESSION between post owner and claimer
+    // CREATE CHAT SESSION between post owner and claimer
     const existingChat = await Chat.findOne({
       postId: post._id,
       claimId: claim._id,
     });
 
+    let chat = existingChat;
     if (!existingChat) {
-      await Chat.create({
+      chat = await Chat.create({
         postId: post._id,
         claimId: claim._id,
         participants: [post.userId, claim.claimerId],
@@ -289,7 +315,31 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
       });
     }
 
-    // TODO: Send notification to claimer (future implementation)
+    // ============================================
+    // 🔔 SEND NOTIFICATION TO CLAIMER (NEW)
+    // ============================================
+    const claimer = await User.findById(claim.claimerId);
+
+    if (claimer && claimer.fcmToken) {
+      try {
+        await sendPushNotification(
+          claimer.fcmToken,
+          {
+            title: "Claim Accepted!",
+            body: `Your claim on "${post.itemName}" was accepted`,
+          },
+          {
+            type: "claim_accepted",
+            postId: post.postId,
+            chatId: chat.chatId, // So they can open chat directly
+          }
+        );
+      } catch (error) {
+        console.error("Failed to send claim accepted notification:", error);
+        // Don't throw error, notification failure shouldn't block status update
+      }
+    }
+    // ============================================
   }
 
   // Populate claim details
@@ -308,7 +358,7 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
     );
 });
 
-// Deletes the user’s own claim if it is still pending
+// Deletes the user's own claim if it is still pending
 const deleteClaim = asyncHandler(async (req, res) => {
   const { claimId } = req.params;
 

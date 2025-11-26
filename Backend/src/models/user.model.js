@@ -23,12 +23,11 @@ const userSchema = new Schema(
     },
     email: {
       type: String,
-      
       required: function () {
         return this.authType === "normal";
       },
       unique: true,
-      sparse: true, // Allows multiple null values for Google auth users
+      sparse: true,
       lowercase: true,
       trim: true,
     },
@@ -44,7 +43,7 @@ const userSchema = new Schema(
       default: "",
     },
     profileImage: {
-      type: String, // cloudinary URL or file path
+      type: String,
       default: "",
     },
     authType: {
@@ -56,7 +55,7 @@ const userSchema = new Schema(
     refreshToken: {
       type: String,
     },
-    // Password Reset OTP Fields (NEW)
+    // Password Reset OTP Fields
     passwordResetOTP: {
       type: String,
     },
@@ -67,14 +66,20 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+
+    // FCM Token (NEW)
+    fcmToken: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
-// Hash password before saving (only for normal auth)
+// Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 10); // Changed from 8 to 10 for better security
+  this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 

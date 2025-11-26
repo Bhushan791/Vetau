@@ -6,7 +6,7 @@ const messageSchema = new mongoose.Schema(
     messageId: {
       type: String,
       default: () => uuidv4(),
-      unique: true,
+      unique: true, // unique already creates an index
       required: true,
     },
     chatId: {
@@ -47,7 +47,7 @@ const messageSchema = new mongoose.Schema(
 
 // Indexes for faster queries
 messageSchema.index({ chatId: 1, createdAt: -1 });
-messageSchema.index({ messageId: 1 });
+// REMOVED: messageSchema.index({ messageId: 1 }); - already defined above
 
 // Validation: Either content or media must be present
 messageSchema.pre("save", function (next) {

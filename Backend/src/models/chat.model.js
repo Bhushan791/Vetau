@@ -8,11 +8,13 @@ const chatSchema = new mongoose.Schema(
       default: () => uuidv4(),
       unique: true,
       required: true,
+      index: true, // REMOVED DUPLICATE - kept only this one
     },
     postId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
       required: true,
+      index: true,
     },
     claimId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -46,8 +48,8 @@ const chatSchema = new mongoose.Schema(
 
 // Index for faster queries
 chatSchema.index({ participants: 1 });
-chatSchema.index({ chatId: 1 });
-chatSchema.index({ postId: 1 });
+// REMOVED: chatSchema.index({ chatId: 1 }); - already defined above
+// REMOVED: chatSchema.index({ postId: 1 }); - already defined above
 
 // Validation: Exactly 2 participants
 chatSchema.pre("save", function (next) {
