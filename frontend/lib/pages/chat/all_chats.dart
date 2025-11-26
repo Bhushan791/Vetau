@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/components/bottomNav.dart';
-import 'package:frontend/components/homeAppBar.dart';
 import 'package:frontend/pages/chat/chat_page.dart';
 import 'package:frontend/stores/chats_provider.dart';
-import 'package:frontend/models/chat_model.dart';
-
+import 'package:intl/intl.dart';
 
 class ChatsPage extends ConsumerStatefulWidget {
   const ChatsPage({super.key});
@@ -18,94 +16,172 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
   @override
   void initState() {
     super.initState();
-    // Load chats when page opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(chatsProvider.notifier).loadChats();
     });
   }
 
+  String _formatTime(String? timestamp) {
+    if (timestamp == null) return '';
+    try {
+      final date = DateTime.parse(timestamp);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+      
+      if (diff.inDays == 0) {
+        return DateFormat('h:mm a').format(date);
+      } else if (diff.inDays < 7) {
+        return DateFormat('E').format(date);
+      } else {
+        return DateFormat('MMM d').format(date);
+      }
+    } catch (e) {
+      return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-        onWillPop: () async {
-        Navigator.pop(context);
-        return false;
-      },
-      child: Scaffold(
-              backgroundColor: Colors.blue,
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(200),
-          child: HomeAppBar(
-            rewardPoints: 120.76,
-            onNotificationTap: () {
-              print("Notification tapped");
-            },
-            onProfileTap: () {
-              print("Profile tapped");
-            },
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Chats',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: Consumer(
-          builder: (context, ref, child) {
-            final chats = ref.watch(chatsProvider);
-            
-            if (chats.isEmpty) {
-              return const Center(
+        automaticallyImplyLeading: false,
+      ),
+      body: Consumer(
+        builder: (context, ref, child) {
+          final chats = ref.watch(chatsProvider);
+          
+          if (chats.isEmpty) {
+            return const Center(
+              child: Text(
+                'No chats available',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            );
+          }
+          
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Text(
-                  'No chats available',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  'Your chats',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              );
-            }
-            
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: chats.length,
-              itemBuilder: (context, index) {
-                final chat = chats[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: NetworkImage(chat.otherParticipant.profileImage),
-                    ),
-                    title: Text(chat.otherParticipant.fullName),
-                    subtitle: Text(
-                      chat.lastMessage,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          chat.itemName,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          chat.postType.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: chat.postType == 'lost' ? Colors.red : Colors.green,
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: chats.length,
+                  itemBuilder: (context, index) {
+                    final chat = chats[index];
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatPage(chatId: chat.chatId),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey.shade200, width: 1),
                           ),
                         ),
-                      ],
-                    ),
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/chat_details',
-                        arguments: chat.chatId,
-                      );
-                    },
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        bottomNavigationBar: const BottomNav(currentIndex: 3),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: Colors.grey[300],
+                              backgroundImage: chat.otherParticipant.profileImage.isNotEmpty
+                                  ? NetworkImage(chat.otherParticipant.profileImage)
+                                  : null,
+                              child: chat.otherParticipant.profileImage.isEmpty
+                                  ? Text(
+                                      chat.otherParticipant.fullName[0].toUpperCase(),
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    chat.itemName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    chat.otherParticipant.fullName,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    chat.lastMessage,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  _formatTime(chat.lastMessageAt),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
+      bottomNavigationBar: const BottomNav(currentIndex: 3),
     );
   }
 }
