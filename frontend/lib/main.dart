@@ -16,6 +16,7 @@ import 'package:frontend/pages/post.dart';
 import 'package:frontend/pages/detail_home.dart';
 import 'package:frontend/pages/profile.dart';
 import 'package:frontend/pages/forgotPassword.dart';
+import 'package:frontend/pages/notification_page.dart';
 
 // GLOBAL NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -57,6 +58,7 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/forgotPassword': (context) => const ForgotPassword(),
         '/editProfile': (context) => const Editprofile(),
+        '/notifications': (context) => const NotificationPage(),
       },
 
       // 🚀 DYNAMIC ROUTES (for postId and chat)

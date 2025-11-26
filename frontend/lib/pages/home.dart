@@ -139,7 +139,7 @@ class _HomePageState extends State<HomePage> {
           preferredSize: const Size.fromHeight(200),
           child: HomeAppBar(
             rewardPoints: 120.76,
-            onNotificationTap: () {},
+            onNotificationTap: () => Navigator.pushNamed(context, '/notifications'),
             onProfileTap: () => Navigator.pushNamed(context, '/profile'),
           ),
         ),

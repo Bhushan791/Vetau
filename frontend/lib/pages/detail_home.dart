@@ -6,6 +6,7 @@ import 'package:frontend/components/post_header.dart';
 import 'package:frontend/components/post_image.dart';
 import 'package:frontend/components/comment_input.dart';
 import 'package:frontend/components/comment_item.dart';
+import 'package:frontend/config/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -174,9 +175,33 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           ),
           const SizedBox(height: 16),
           
-          Text(
-            post["itemName"] ?? "",
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  post["itemName"] ?? "",
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: post["type"] == "lost"
+                      ? Colors.redAccent
+                      : const Color(0xFF2196F3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  (post["type"] ?? "").toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           
@@ -207,7 +232,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           const SizedBox(height: 16),
           
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: _showClaimDialog,
             icon: const Icon(Icons.chat_outlined, color: Colors.white),
             label: const Text("Claim as found", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
             style: ElevatedButton.styleFrom(
@@ -277,6 +302,84 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
   String _formatDate(String? dateStr) {
     if (dateStr == null) return "";
     return DateTime.tryParse(dateStr)?.toLocal().toString().split(' ')[0] ?? "";
+  }
+
+  void _showClaimDialog() {
+    final messageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Send a message request"),
+        content: TextField(
+          controller: messageController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: "Enter your message",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (messageController.text.trim().isEmpty) return;
+              Navigator.pop(context);
+              await _sendClaimRequest(messageController.text.trim());
+            },
+            child: const Text("Send"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendClaimRequest(String message) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+
+    try {
+      final url = "${ApiConstants.baseUrl}/claims/";
+      print("Sending claim to: $url");
+      print("PostId: ${widget.postId}");
+      print("Message: $message");
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'postId': widget.postId,
+          'message': message,
+        }),
+      );
+
+      print("Response status: ${response.statusCode}");
+      print("Response body: ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Claim request sent successfully")),
+          );
+        }
+      } else {
+        throw Exception("Failed to send claim: ${response.body}");
+      }
+    } catch (e) {
+      print("Claim error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    }
   }
 
 
