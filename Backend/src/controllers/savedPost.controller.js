@@ -10,11 +10,11 @@ import { asyncHandler } from "../utils/asyncHandler.js";
  * @access Private
  */
 export const savePost = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
+  const { postId } = req.params; // UUID string
   const userId = req.user._id;
 
   // Check if post exists
-  const post = await Post.findById(postId);
+  const post = await Post.findOne({ postId });
   if (!post) {
     throw new ApiError(404, "Post not found");
   }
@@ -25,10 +25,10 @@ export const savePost = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Post already saved");
   }
 
-  // Save the post
+  // Save the post with UUID
   const savedPost = await SavedPost.create({
     userId,
-    postId,
+    postId, // Store UUID directly
   });
 
   return res
@@ -42,7 +42,7 @@ export const savePost = asyncHandler(async (req, res) => {
  * @access Private
  */
 export const unsavePost = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
+  const { postId } = req.params; // UUID string
   const userId = req.user._id;
 
   // Find and delete
@@ -68,18 +68,32 @@ export const getMySavedPosts = asyncHandler(async (req, res) => {
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
-  // Get saved posts with populated post details
+  // Get saved posts
   const savedPosts = await SavedPost.find({ userId })
-    .populate({
-      path: "postId",
-      populate: {
-        path: "userId",
-        select: "fullName username profileImage",
-      },
-    })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(parseInt(limit));
+
+  // Get all postIds
+  const postIds = savedPosts.map((sp) => sp.postId);
+
+  // Fetch actual posts with user details
+  const posts = await Post.find({ postId: { $in: postIds } }).populate({
+    path: "userId",
+    select: "fullName username profileImage",
+  });
+
+  // Map posts to savedPosts order
+  const postsMap = {};
+  posts.forEach((post) => {
+    postsMap[post.postId] = post;
+  });
+
+  const savedPostsWithDetails = savedPosts.map((sp) => ({
+    savedPostId: sp.savedPostId,
+    createdAt: sp.createdAt,
+    post: postsMap[sp.postId] || null,
+  }));
 
   // Get total count
   const totalSavedPosts = await SavedPost.countDocuments({ userId });
@@ -88,7 +102,7 @@ export const getMySavedPosts = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        savedPosts,
+        savedPosts: savedPostsWithDetails,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalSavedPosts / parseInt(limit)),
@@ -107,7 +121,7 @@ export const getMySavedPosts = asyncHandler(async (req, res) => {
  * @access Private
  */
 export const checkIfPostSaved = asyncHandler(async (req, res) => {
-  const { postId } = req.params;
+  const { postId } = req.params; // UUID string
   const userId = req.user._id;
 
   const savedPost = await SavedPost.findOne({ userId, postId });

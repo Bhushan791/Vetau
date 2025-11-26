@@ -16,8 +16,7 @@ const savedPostSchema = new mongoose.Schema(
       index: true,
     },
     postId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Post",
+      type: String, // Changed to String to store UUID
       required: true,
       index: true,
     },
