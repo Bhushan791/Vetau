@@ -97,24 +97,7 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
 
-                  // 🧩 Filter Component (unchanged)
-                  FilterComponent(),
-                  const SizedBox(height: 20),
-
-                  // 🧠 Display selected filters
-                  Text(
-                    selected.isEmpty
-                        ? "No filters selected"
-                        : "You selected: ${selected.join(', ')}",
-                    style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500),
-                  ),
-
-                  const SizedBox(height: 25),
 
                   // 🕓 Recent Searches
                   const Text(

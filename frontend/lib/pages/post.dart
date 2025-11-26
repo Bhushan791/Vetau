@@ -73,6 +73,7 @@ class _PostPageState extends State<PostPage> {
   // Controllers for text fields
   final TextEditingController _headingController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _tagsController = TextEditingController();
   final TextEditingController _rewardController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
@@ -261,11 +262,21 @@ class _PostPageState extends State<PostPage> {
         _selectedPostType == PostType.lost ? "lost" : "found";
 
     request.fields['itemName'] = _headingController.text.trim();
-    request.fields['category'] = "others"; // TEMP
+    request.fields['category'] = _categoryController.text.trim().isNotEmpty 
+        ? _categoryController.text.trim() 
+        : "others";
     request.fields['rewardAmount'] = _rewardController.text.trim();
     request.fields['description'] = _descriptionController.text.trim();
     request.fields['tags'] = _tagsController.text.trim();
-    request.fields['isAnonymous'] = _isAnonymous.toString();
+    
+    // Debug: Check the actual value
+    debugPrint("_isAnonymous value: $_isAnonymous");
+    debugPrint("Sending isAnonymous as: ${_isAnonymous.toString()}");
+    
+    // Don't send isAnonymous field at all if false (backend will default to false)
+    if (_isAnonymous) {
+      request.fields['isAnonymous'] = 'true';
+    }
 
     // Location text only
     request.fields['location'] = _locationController.text.trim();
@@ -301,7 +312,8 @@ class _PostPageState extends State<PostPage> {
       'Accept': 'application/json',
     });
 
-    print("Sending temporary API request...");
+    debugPrint("Request fields: ${request.fields}");
+    debugPrint("Sending API request...");
 
     try {
       final streamedResponse = await request.send();
@@ -391,6 +403,9 @@ class _PostPageState extends State<PostPage> {
 
             _buildSectionTitle('Post Description'),
             _buildInputField(controller: _descriptionController, hint: 'Share details about your lost/found item...', maxLines: 5),
+
+            _buildSectionTitle('Category'),
+            _buildInputField(controller: _categoryController, hint: 'e.g., pets, electronics, documents, vehicle'),
 
             _buildSectionTitle('Upload Image'),
             GestureDetector(

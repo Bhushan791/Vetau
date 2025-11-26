@@ -1,34 +1,93 @@
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final filterStoreProvider =
-    StateNotifierProvider<FilterStore, List<String>>((ref) {
-  return FilterStore();
-});
+class FilterLocation {
+  final double lat;
+  final double lng;
 
-class FilterStore extends StateNotifier<List<String>> {
-  FilterStore() : super(['All']); // Default: All selected
+  FilterLocation({required this.lat, required this.lng});
+}
 
-  void toggleFilter(String filter) {
-    if (filter == 'All') {
-      // Selecting All clears others
-      state = ['All'];
-      return;
-    }
+class FilterState {
+  final String? type;
+  final List<String> categories;
+  final bool nearMe;
+  final bool highReward;
+  final FilterLocation? location;
 
-    // Remove "All" when another filter is selected
-    final current = [...state]..remove('All');
+  const FilterState({
+    this.type,
+    this.categories = const [],
+    this.nearMe = false,
+    this.highReward = false,
+    this.location,
+  });
 
-    if (current.contains(filter)) {
-      current.remove(filter);
-    } else {
-      current.add(filter);
-    }
-
-    // If nothing selected, revert back to All
-    if (current.isEmpty) current.add('All');
-
-    state = current;
+  FilterState copyWith({
+    String? type,
+    List<String>? categories,
+    bool? nearMe,
+    bool? highReward,
+    FilterLocation? location,
+    bool clearType = false,
+    bool clearLocation = false,
+  }) {
+    return FilterState(
+      type: clearType ? null : (type ?? this.type),
+      categories: categories ?? this.categories,
+      nearMe: nearMe ?? this.nearMe,
+      highReward: highReward ?? this.highReward,
+      location: clearLocation ? null : (location ?? this.location),
+    );
   }
 
-  void clearFilters() => state = ['All'];
+  String get summaryText {
+    List<String> parts = [];
+    if (type != null) parts.add("Type: $type");
+    if (categories.isNotEmpty) parts.add("Categories: ${categories.join(', ')}");
+    if (nearMe) parts.add("Near Me");
+    if (highReward) parts.add("High Reward");
+    return parts.isEmpty ? "No filters selected" : parts.join(" • ");
+  }
 }
+
+class FilterStore extends Notifier<FilterState> {
+  @override
+  FilterState build() => const FilterState();
+
+  void toggleType(String type) {
+    state = state.copyWith(
+      type: state.type == type ? null : type,
+      clearType: state.type == type,
+    );
+  }
+
+  void toggleCategory(String category) {
+    final cats = List<String>.from(state.categories);
+    if (cats.contains(category)) {
+      cats.remove(category);
+    } else {
+      cats.add(category);
+    }
+    state = state.copyWith(categories: cats);
+  }
+
+  void setNearMe(bool value, {required double lat, required double lng}) {
+    state = state.copyWith(
+      nearMe: value,
+      location: value ? FilterLocation(lat: lat, lng: lng) : null,
+      clearLocation: !value,
+    );
+  }
+
+  void toggleHighReward() {
+    state = state.copyWith(highReward: !state.highReward);
+  }
+
+  void clearFilters() {
+    state = const FilterState();
+  }
+}
+
+final filterStoreProvider = NotifierProvider<FilterStore, FilterState>(() {
+  return FilterStore();
+});
