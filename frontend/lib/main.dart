@@ -19,11 +19,27 @@ import 'package:frontend/pages/profile.dart';
 import 'package:frontend/pages/forgotPassword.dart';
 import 'package:frontend/pages/notification_page.dart';
 
+// 🔥 Firebase imports
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 // GLOBAL NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// 🔥 Background Notification Handler
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(); 
+  print("Background Notification Received: ${message.notification?.title}");
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 Initialize Firebase
+  await Firebase.initializeApp();
+
+  // 🔥 Register background handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // 🔥 Initialize deep-link listener BEFORE running app
   await AuthLinkHandler.init(() {
@@ -62,36 +78,29 @@ class MyApp extends StatelessWidget {
         '/notifications': (context) => const NotificationPage(),
       },
 
-      // 🚀 DYNAMIC ROUTES (for postId and chat)
+      // 🚀 DYNAMIC ROUTES
       onGenerateRoute: (settings) {
-        // For opening detail page with postId
         if (settings.name == '/detailHome') {
           final String postId = settings.arguments as String;
-
           return MaterialPageRoute(
             builder: (_) => DetailHome(postId: postId),
           );
         }
 
-        // For opening chat details with chatId
         if (settings.name == '/chat_details') {
           final String chatId = settings.arguments as String;
-
           return MaterialPageRoute(
             builder: (_) => ChatPage(chatId: chatId),
           );
         }
 
-        // For opening search results with query
         if (settings.name == '/search_results') {
           final String searchQuery = settings.arguments as String;
-
           return MaterialPageRoute(
             builder: (_) => SearchResults(searchQuery: searchQuery),
           );
         }
 
-        // default fallback route
         return MaterialPageRoute(
           builder: (_) => const HomePage(),
         );

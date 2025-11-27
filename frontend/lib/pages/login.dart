@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/services/cookie_storage.dart';
+import 'package:frontend/services/fcm_services.dart';
 import 'package:frontend/services/token_service.dart';
 import 'package:frontend/services/socket_service.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -176,6 +177,7 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('userEmail', data['data']['user']['email']);
         await prefs.setString(
             'userProfileImage', data['data']['user']['profileImage'] ?? '');
+        await FCMService.initializeFCM(userId, accessToken);
 
         print('👤 User profile saved');
 

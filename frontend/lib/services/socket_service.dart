@@ -193,13 +193,11 @@ class SocketService {
     socket = null;
     
     isConnected = false;
-    _currentUserId = null;
     print('🧹 Socket cleanup complete - socket set to null');
   }
 
   void reset() {
     cleanup();
-    _currentUserId = null;
     _instance = null;
     print('🔄 Socket instance reset for new user');
   }
