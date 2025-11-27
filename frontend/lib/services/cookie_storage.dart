@@ -15,4 +15,8 @@ class CookieStorage {
   static Future<void> clear() async {
     await cookieJar.deleteAll();
   }
+
+  static Future<void> clearCookies() async {
+    await cookieJar.deleteAll();
+  }
 }

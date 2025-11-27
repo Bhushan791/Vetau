@@ -59,12 +59,15 @@ class FilterComponent extends ConsumerWidget {
     }
 
     return Container(
+      height: 50,
       padding: const EdgeInsets.symmetric(vertical: 8),
-      color: const Color(0xFFF1F6FD),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: filters.map((filter) {
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = filters[index];
           final selected = isSelected(filter);
 
           return GestureDetector(
@@ -114,7 +117,7 @@ class FilterComponent extends ConsumerWidget {
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:frontend/services/token_service.dart';
 import 'package:frontend/stores/chat_message_provider.dart';
 import 'package:frontend/stores/chats_provider.dart';
 import 'package:frontend/services/chat_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final chatControllerProvider =
     Provider.family<ChatController, String>((ref, roomId) {
@@ -68,7 +69,6 @@ class ChatController {
   /// SEND MESSAGE
   /// ---------------------------
   Future<void> sendMessage(String content) async {
-    // Send via socket - backend will broadcast to all participants including sender
     SocketService.instance.sendMessage(roomId, content);
   }
 
@@ -134,10 +134,9 @@ class ChatController {
   }
 
   Future<String?> _getCurrentUserId() async {
-    final token = await TokenService().getAccessToken();
-    if (token == null) return null;
-    
-    final payload = TokenService().decodeToken(token);
-    return payload?['_id'];
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    print('🆔 Current user ID from SharedPreferences: $userId');
+    return userId;
   }
 }

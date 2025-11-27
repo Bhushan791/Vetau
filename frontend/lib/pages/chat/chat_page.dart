@@ -5,7 +5,6 @@ import 'package:frontend/models/message_model.dart';
 import 'package:frontend/services/socket_service.dart';
 import 'package:frontend/controllers/chat_controller.dart';
 import 'package:frontend/stores/chat_message_provider.dart';
-import 'package:frontend/stores/socket_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -25,57 +24,47 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool isTyping = false;
   String typingUser = '';
   XFile? _selectedImage;
-  
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize controller
-    chatController = ref.read(chatControllerProvider(widget.chatId));
-
-    // Add typing listener
     _messageController.addListener(_onTextChanged);
-
-    // Load messages from API
-    chatController.loadInitialMessages();
-
-    // Setup socket
-    _initSocket();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      chatController = ref.read(chatControllerProvider(widget.chatId));
+      chatController.loadInitialMessages();
+      _setupSocketListeners();
+    });
   }
 
-  void _initSocket() async {
+  void _setupSocketListeners() async {
     try {
-      await SocketService.instance.initSocket();
-      print('🔧 Socket initialized');
+      int retries = 0;
+      while (!SocketService.instance.isConnected && retries < 5) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        retries++;
+      }
       
-      SocketService.instance.joinRoom(widget.chatId);
-      await chatController.initSocketListeners();
-      print('🔧 Socket listeners initialized');
+      if (!mounted) return;
       
-      // Listen for typing indicators - FILTERED BY ROOM ID
-      SocketService.instance.onUserTyping((data) {
-        if (data['chatId']?.toString() != widget.chatId) return;
-        setState(() {
-          typingUser = data['fullName'] ?? 'Someone';
+      if (SocketService.instance.isConnected) {
+        SocketService.instance.joinRoom(widget.chatId);
+        await chatController.initSocketListeners();
+        print('🔧 Socket listeners initialized');
+        
+        SocketService.instance.onUserTyping((data) {
+          if (data['chatId']?.toString() != widget.chatId) return;
+          if (mounted) setState(() => typingUser = data['fullName'] ?? 'Someone');
         });
-      });
-      
-      SocketService.instance.onUserStopTyping((data) {
-        if (data['chatId']?.toString() != widget.chatId) return;
-        setState(() {
-          typingUser = '';
+        
+        SocketService.instance.onUserStopTyping((data) {
+          if (data['chatId']?.toString() != widget.chatId) return;
+          if (mounted) setState(() => typingUser = '');
         });
-      });
+      } else {
+        print('⚠️ Socket connection timeout');
+      }
     } catch (e) {
-      print('❌ Socket initialization error: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to connect to chat server: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('❌ Socket setup error: $e');
     }
   }
 
@@ -83,16 +72,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Stop typing indicator
     SocketService.instance.sendStopTyping(widget.chatId);
     setState(() => isTyping = false);
 
-    // Send message
     await chatController.sendMessage(text);
-
     _messageController.clear();
     
-    // Scroll to bottom after sending
     Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
   }
 
@@ -226,9 +211,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _messageController.removeListener(_onTextChanged);
     _messageController.dispose();
     _scrollController.dispose();
-    // Clear messages when leaving chat
-    ref.read(chatMessagesProvider(widget.chatId).notifier).clear();
-    // Clear socket listeners
     SocketService.instance.clearListeners();
     super.dispose();
   }

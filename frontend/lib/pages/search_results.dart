@@ -111,7 +111,8 @@ class _SearchResultsState extends State<SearchResults> {
                     padding: const EdgeInsets.all(16),
                     itemCount: posts.length,
                     itemBuilder: (context, index) {
-                      return GestureDetector(
+                      return PostCard(
+                        post: posts[index],
                         onTap: () {
                           final postId = posts[index]["postId"] ?? posts[index]["_id"];
                           Navigator.push(
@@ -121,7 +122,6 @@ class _SearchResultsState extends State<SearchResults> {
                             ),
                           );
                         },
-                        child: PostCard(post: posts[index]),
                       );
                     },
                   ),

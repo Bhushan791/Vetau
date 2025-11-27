@@ -3,67 +3,77 @@ import 'package:frontend/config/socket_config.dart';
 import 'package:frontend/services/token_service.dart';
 
 class SocketService {
-  // Singleton instance
-  static final SocketService _instance = SocketService._internal();
-  static SocketService get instance => _instance;
+  static SocketService? _instance;
+  static SocketService get instance {
+    _instance ??= SocketService._internal();
+    return _instance!;
+  }
 
-  late io.Socket socket;
+  io.Socket? socket;
   bool isConnected = false;
 
+
   SocketService._internal();
-  
-  // Getter for connection status
-  bool get connectionStatus => isConnected && socket.connected;
 
-  /// Initialize and connect socket
+
+  
+  bool get connectionStatus => isConnected && (socket?.connected ?? false);
+
   Future<void> initSocket() async {
-  final tokenService = TokenService();
-  final token = await tokenService.getAccessToken();
+    final tokenService = TokenService();
+    final token = await tokenService.getAccessToken();
+    
+    if (token == null) {
+      print('❌ No token available for socket initialization');
+      return;
+    }
 
-  print('🔧 Initializing socket with token: ${token?.substring(0, 20)}...');
+    if (socket != null) {
+      socket!.dispose();
+      socket = null;
+    }
 
-  socket = io.io(
-    SocketConfig.socketBaseUrl,
-    io.OptionBuilder()
-        .setTransports(['websocket'])
-        .enableAutoConnect()
-        .setReconnectionAttempts(5)
-        .setReconnectionDelay(1000)
-        .setAuth({
-          'token': 'Bearer $token',
-        })
-        .build(),
-  );
+    print('🔧 Initializing socket with token: ${token.substring(0, 20)}...');
 
-  _registerCoreListeners();
-  
-  print('🔧 Socket object created, waiting for connection...');
-}
+    socket = io.io(
+      SocketConfig.socketBaseUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .enableAutoConnect()
+          .setReconnectionAttempts(5)
+          .setReconnectionDelay(1000)
+          .setAuth({
+            'token': 'Bearer $token',
+          })
+          .build(),
+    );
 
+    _registerCoreListeners();
+    print('🔧 Socket object created, waiting for connection...');
+  }
 
   void _registerCoreListeners() {
-    socket.on('connect', (_) {
+    socket!.on('connect', (_) {
       isConnected = true;
-      print('🔌 SOCKET CONNECTED: ${socket.id}');
+      print('🔌 SOCKET CONNECTED: ${socket!.id}');
     });
 
-    socket.on('disconnect', (_) {
+    socket!.on('disconnect', (_) {
       isConnected = false;
       print('🔌 SOCKET DISCONNECTED');
     });
 
-    socket.on('connect_error', (data) {
+    socket!.on('connect_error', (data) {
       isConnected = false;
       final errorMsg = data.toString();
       print('❌ SOCKET CONNECTION ERROR: $errorMsg');
       
-      // If authentication error, try to refresh token and reconnect
       if (errorMsg.contains('Authentication')) {
         _handleAuthError();
       }
     });
 
-    socket.on('error', (data) {
+    socket!.on('error', (data) {
       final errorMsg = data.toString();
       print('❌ SOCKET ERROR: $errorMsg');
     });
@@ -74,13 +84,11 @@ class SocketService {
       print('🔄 Attempting token refresh for socket...');
       final tokenService = TokenService();
       
-      // Check if token needs refresh
       if (await tokenService.isAccessTokenExpired()) {
-        // Token refresh is handled by ApiClient, just get new token
         final newToken = await tokenService.getAccessToken();
         if (newToken != null) {
-          // Reconnect with new token
-          socket.dispose();
+          socket?.dispose();
+          socket = null;
           await initSocket();
         }
       }
@@ -89,48 +97,42 @@ class SocketService {
     }
   }
 
-  /// Join a specific chat room
   void joinRoom(String chatId) {
-    if (!isConnected) {
+    if (!isConnected || socket == null) {
       print('⚠️ Cannot join room, socket not connected yet');
       return;
     }
-    socket.emit('join_chat', {'chatId': chatId});
+    socket!.emit('join_chat', {'chatId': chatId});
     print('📡 Joined room: $chatId');
   }
 
-  /// Send message to backend
   void sendMessage(String chatId, String content) {
-    print('📤 Attempting to send message. Connected: $isConnected, Socket connected: ${socket.connected}');
-    if (!isConnected && !socket.connected) {
+    print('📤 Attempting to send message. Connected: $isConnected, Socket connected: ${socket?.connected}');
+    if (!isConnected || socket == null || !socket!.connected) {
       print('⚠️ Cannot send message, socket not connected');
       return;
     }
-    socket.emit('send_message', {
+    socket!.emit('send_message', {
       'chatId': chatId,
       'content': content,
     });
     print('📤 Message emitted via socket');
   }
 
-  /// Listen for incoming messages
   void onNewMessage(void Function(dynamic) callback) {
-    socket.on('new_message', callback);
+    socket?.on('new_message', callback);
   }
 
-  /// Listen for message sent confirmation
   void onMessageSent(void Function(dynamic) callback) {
-    socket.on('message_sent', callback);
+    socket?.on('message_sent', callback);
   }
 
-  /// Listen for joined chat confirmation
   void onJoinedChat(void Function(dynamic) callback) {
-    socket.on('joined_chat', callback);
+    socket?.on('joined_chat', callback);
   }
 
-  /// Listen for errors
   void onError(void Function(dynamic) callback) {
-    socket.on('error', (data) {
+    socket?.on('error', (data) {
       final error = {
         'message': data['message'] ?? data.toString(),
         'type': 'socket_error'
@@ -139,50 +141,94 @@ class SocketService {
     });
   }
 
-  /// Listen for typing indicators
   void onUserTyping(void Function(dynamic) callback) {
-    socket.on('user_typing', callback);
+    socket?.on('user_typing', callback);
   }
 
   void onUserStopTyping(void Function(dynamic) callback) {
-    socket.on('user_stop_typing', callback);
+    socket?.on('user_stop_typing', callback);
   }
 
-  /// Send typing indicator
   void sendTyping(String chatId) {
-    if (!isConnected) return;
-    socket.emit('typing', {'chatId': chatId});
+    if (!isConnected || socket == null) return;
+    socket!.emit('typing', {'chatId': chatId});
   }
 
   void sendStopTyping(String chatId) {
-    if (!isConnected) return;
-    socket.emit('stop_typing', {'chatId': chatId});
+    if (!isConnected || socket == null) return;
+    socket!.emit('stop_typing', {'chatId': chatId});
   }
 
-  /// Clear all listeners to prevent duplicates (but keep core connection listeners)
   void clearListeners() {
-    socket.off('new_message');
-    socket.off('message_sent');
-    socket.off('joined_chat');
-    socket.off('user_typing');
-    socket.off('user_stop_typing');
-    // Don't clear 'connect', 'disconnect', 'connect_error', 'error' - these are core listeners
+    socket?.off('new_message');
+    socket?.off('message_sent');
+    socket?.off('joined_chat');
+    socket?.off('user_typing');
+    socket?.off('user_stop_typing');
   }
 
-  /// Reconnect socket manually
+  void cleanup() {
+    print('🧹 Cleaning up socket service...');
+    
+    if (socket == null) {
+      print('🧹 Socket already null, nothing to cleanup');
+      return;
+    }
+    
+    socket!.offAny();
+    socket!.off('new_message');
+    socket!.off('message_sent');
+    socket!.off('joined_chat');
+    socket!.off('user_typing');
+    socket!.off('user_stop_typing');
+    socket!.off('connect');
+    socket!.off('disconnect');
+    socket!.off('connect_error');
+    socket!.off('error');
+    
+    if (socket!.connected) {
+      socket!.disconnect();
+    }
+    socket!.dispose();
+    socket = null;
+    
+    isConnected = false;
+    _currentUserId = null;
+    print('🧹 Socket cleanup complete - socket set to null');
+  }
+
+  void reset() {
+    cleanup();
+    _currentUserId = null;
+    _instance = null;
+    print('🔄 Socket instance reset for new user');
+  }
+
   Future<void> reconnect() async {
-    if (socket.connected) {
-      socket.disconnect();
+    if (socket?.connected ?? false) {
+      socket!.disconnect();
     }
     await initSocket();
+    await waitForConnection();
   }
 
-  /// Disconnect socket
-  void dispose() {
-    if (socket.connected) {
-      socket.disconnect();
+  Future<void> waitForConnection() async {
+    int retries = 0;
+    while (!isConnected && retries < 10) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      retries++;
     }
-    socket.dispose();
+    if (!isConnected) {
+      print('❌ Socket connection timeout after retries');
+    }
+  }
+
+  void dispose() {
+    if (socket?.connected ?? false) {
+      socket!.disconnect();
+    }
+    socket?.dispose();
+    socket = null;
     isConnected = false;
   }
 }

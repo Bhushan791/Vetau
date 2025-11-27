@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/token_service.dart';
+import 'package:frontend/services/socket_service.dart';
+import 'package:frontend/services/cookie_storage.dart';
+import 'package:frontend/stores/chats_provider.dart';
+import 'package:frontend/stores/chat_message_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,14 +49,14 @@ class CurvedBottomClipper extends CustomClipper<Path> {
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends ConsumerState<ProfilePage> {
   String _userName = 'Luniva Maharjan';
   String _userEmail = 'mhrznluniva22@gmail.com';
   String _userPhone = '+977 - 9823456789';
@@ -145,17 +150,32 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _isLogoutLoading = false);
 
       if (response.statusCode == 200) {
+        print('🔐 Logout API successful');
+        
+        SocketService.instance.cleanup();
+        print('🧹 Socket cleaned up');
+        
         await tokenService.clearAccessToken();
+        print('✅ Access token cleared');
+        
         final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('userId');
-        await prefs.remove('userName');
-        await prefs.remove('userEmail');
+        await prefs.clear();
+        print('✅ SharedPreferences cleared');
+        
+        await CookieStorage.clearCookies();
+        print('🍪 Cookies cleared');
+        
+        ref.invalidate(chatsProvider);
+        ref.invalidate(chatMessagesProvider);
+        print('🧹 All providers invalidated');
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Logged out successfully'), backgroundColor: Colors.green),
         );
 
-        if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        }
       } else {
         final errorData = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(

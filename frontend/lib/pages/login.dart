@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/services/cookie_storage.dart';
 import 'package:frontend/services/token_service.dart';
+import 'package:frontend/services/socket_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// --- Constants ---
 const Color primaryBlue = Color(0xFF4285F4);
 const Color secondaryGray = Color(0xFFE0E0E0);
 const double cardPadding = 24.0;
 const String apiBaseUrl = ApiConstants.baseUrl;
 
-// --- Custom TextField Widget ---
 class LabeledInputField extends StatelessWidget {
   final String label;
   final String hintText;
@@ -98,7 +97,6 @@ class LabeledInputField extends StatelessWidget {
   }
 }
 
-// --- Login Page ---
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -114,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordObscured = true;
   bool _isLoading = false;
 
-  String? errorMessage; // 🔴 Inline error container message
+  String? errorMessage;
 
   @override
   void dispose() {
@@ -155,42 +153,39 @@ class _LoginPageState extends State<LoginPage> {
 
       setState(() => _isLoading = false);
 
-      // -----------------------------
-      // SUCCESS (HTTP 200)
-      // -----------------------------
       if (response.statusCode == 200) {
         print('✅ Login successful');
 
-        // Save refresh cookie (if backend sends one)
         if (response.headers.containsKey('set-cookie')) {
           final cookieHeader = response.headers['set-cookie']!;
           await CookieStorage.saveCookies(uri, [cookieHeader]);
           print("🍪 Refresh token cookie saved");
-        } else {
-          print("🍪 No Set-Cookie found — backend may be blocking cookie");
         }
 
         final data = jsonDecode(response.body);
         final tokenService = TokenService();
-
-        // Get access token
         final accessToken = data['data']['accessToken'];
 
-        // Save access token to SharedPreferences
         await tokenService.saveAccessToken(accessToken);
-        print('✅ Access token saved to SharedPreferences');
+        print('✅ Access token saved');
 
-        // Save user data
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userId', data['data']['user']['_id']);
+        final userId = data['data']['user']['_id'];
+        await prefs.setString('userId', userId);
         await prefs.setString('userName', data['data']['user']['fullName']);
         await prefs.setString('userEmail', data['data']['user']['email']);
         await prefs.setString(
             'userProfileImage', data['data']['user']['profileImage'] ?? '');
 
-        print('👤 User profile saved to SharedPreferences');
+        print('👤 User profile saved');
 
-        // Navigate to home
+        SocketService.instance.reset();
+        print('🔄 Socket reset');
+        
+        await SocketService.instance.initSocket();
+        await SocketService.instance.waitForConnection();
+        print('🔧 Socket initialized with new token');
+
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
@@ -198,9 +193,6 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // -----------------------------
-      // FAILURE (400, 401, 404, etc.)
-      // -----------------------------
       print("❌ Login failed — Status: ${response.statusCode}");
 
       String serverMessage = "Login failed";
@@ -212,12 +204,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         errorMessage = serverMessage;
       });
-    }
-
-    // -----------------------------
-    // NETWORK / SERVER ERROR
-    // -----------------------------
-    catch (e) {
+    } catch (e) {
       print('❌ Login error: $e');
 
       setState(() {
@@ -266,7 +253,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // 🔴 Inline Error Box
                     if (errorMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
