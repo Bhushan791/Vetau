@@ -50,10 +50,7 @@ class PostsState {
 
 class PostsNotifier extends Notifier<PostsState> {
   @override
-  PostsState build() {
-    ref.listen(filterStoreProvider, (_, __) => fetchPosts());
-    return const PostsState();
-  }
+  PostsState build() => const PostsState();
 
   String _buildUrl(int page) {
     final filters = ref.read(filterStoreProvider);
@@ -63,12 +60,12 @@ class PostsNotifier extends Notifier<PostsState> {
     };
 
     if (filters.type != null) params['type'] = filters.type!;
-    if (filters.categories.isNotEmpty) params['category'] = filters.categories.join(',');
+    if (filters.categories.isNotEmpty) params['categories'] = filters.categories.join(',');
     if (filters.highReward) params['highReward'] = 'true';
     if (filters.nearMe && filters.location != null) {
-      params['nearMe'] = 'true';
-      params['latitude'] = filters.location!.lat.toString();
-      params['longitude'] = filters.location!.lng.toString();
+      params['near_me'] = 'true';
+      params['lat'] = filters.location!.lat.toString();
+      params['lng'] = filters.location!.lng.toString();
     }
 
     final uri = Uri.parse("${ApiConstants.baseUrl}/posts");

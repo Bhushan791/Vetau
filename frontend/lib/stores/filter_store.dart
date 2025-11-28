@@ -71,12 +71,19 @@ class FilterStore extends Notifier<FilterState> {
     state = state.copyWith(categories: cats);
   }
 
-  void setNearMe(bool value, {required double lat, required double lng}) {
-    state = state.copyWith(
-      nearMe: value,
-      location: value ? FilterLocation(lat: lat, lng: lng) : null,
-      clearLocation: !value,
-    );
+  void toggleNearMe(bool value, {double? lat, double? lng}) {
+    if (value && lat != null && lng != null) {
+      state = state.copyWith(
+        nearMe: true,
+        location: FilterLocation(lat: lat, lng: lng),
+      );
+    } else {
+      state = state.copyWith(
+        nearMe: false,
+        location: null,
+        clearLocation: true,
+      );
+    }
   }
 
   void toggleHighReward() {

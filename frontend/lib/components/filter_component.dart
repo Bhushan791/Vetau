@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/stores/filter_store.dart';
+import 'package:frontend/stores/posts_provider.dart';
 import 'package:geolocator/geolocator.dart';
 
 class FilterComponent extends ConsumerWidget {
@@ -73,13 +74,20 @@ class FilterComponent extends ConsumerWidget {
           return GestureDetector(
             onTap: () async {
               final store = ref.read(filterStoreProvider.notifier);
+              final postsNotifier = ref.read(postsProvider.notifier);
 
               if (filter == "All") {
                 store.clearFilters();
               } else if (filter == "Near Me") {
-                final pos = await _requestLocation();
-                if (pos != null) {
-                  store.setNearMe(true, lat: pos.latitude, lng: pos.longitude);
+                if (selected) {
+                  store.toggleNearMe(false);
+                } else {
+                  final pos = await _requestLocation();
+                  if (pos != null) {
+                    store.toggleNearMe(true, lat: pos.latitude, lng: pos.longitude);
+                  } else {
+                    return;
+                  }
                 }
               } else if (filter == "Lost") {
                 store.toggleType("lost");
@@ -90,6 +98,8 @@ class FilterComponent extends ConsumerWidget {
               } else {
                 store.toggleCategory(filter.toLowerCase());
               }
+
+              await postsNotifier.fetchPosts();
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

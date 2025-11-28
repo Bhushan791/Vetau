@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/stores/notifications_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
-class NotificationPage extends StatefulWidget {
+class NotificationPage extends ConsumerStatefulWidget {
   const NotificationPage({super.key});
 
   @override
-  State<NotificationPage> createState() => _NotificationPageState();
+  ConsumerState<NotificationPage> createState() => _NotificationPageState();
 }
 
-class _NotificationPageState extends State<NotificationPage> with SingleTickerProviderStateMixin {
+class _NotificationPageState extends ConsumerState<NotificationPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<dynamic> myClaims = [];
   List<dynamic> claimsOnMyPosts = [];
@@ -21,21 +23,77 @@ class _NotificationPageState extends State<NotificationPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index == 0) {
-        fetchMyClaims();
+        ref.read(notificationsProvider.notifier).fetchNotifications();
       } else if (_tabController.index == 1) {
+        fetchMyClaims();
+      } else if (_tabController.index == 2) {
         fetchClaimsOnMyPosts();
       }
     });
-    fetchMyClaims();
+    ref.read(notificationsProvider.notifier).fetchNotifications();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Widget _buildAllNotifications() {
+    final notificationsState = ref.watch(notificationsProvider);
+
+    if (notificationsState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (notificationsState.notifications.isEmpty) {
+      return const Center(child: Text('No notifications'));
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => ref.read(notificationsProvider.notifier).fetchNotifications(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: notificationsState.notifications.length,
+        itemBuilder: (context, index) {
+          final notification = notificationsState.notifications[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: notification.isRead ? Colors.white : Colors.blue.shade50,
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundImage: notification.senderImage.isNotEmpty
+                    ? NetworkImage(notification.senderImage)
+                    : null,
+                child: notification.senderImage.isEmpty
+                    ? Text(notification.senderName[0].toUpperCase())
+                    : null,
+              ),
+              title: Text(notification.senderName),
+              subtitle: Text(notification.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: !notification.isRead
+                  ? Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                if (!notification.isRead) {
+                  ref.read(notificationsProvider.notifier).markAsRead(notification.id);
+                }
+              },
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> fetchMyClaims() async {
@@ -101,9 +159,6 @@ class _NotificationPageState extends State<NotificationPage> with SingleTickerPr
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('accessToken');
 
-      print('Updating claim: $claimId with status: $status');
-      print('Token: $token');
-
       final response = await http.patch(
         Uri.parse('${ApiConstants.baseUrl}/claims/$claimId/status/'),
         headers: {
@@ -112,9 +167,6 @@ class _NotificationPageState extends State<NotificationPage> with SingleTickerPr
         },
         body: jsonEncode({'status': status}),
       );
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -184,6 +236,7 @@ class _NotificationPageState extends State<NotificationPage> with SingleTickerPr
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.blue,
           tabs: const [
+            Tab(text: 'All Notifications'),
             Tab(text: 'Your Claims'),
             Tab(text: 'Claims on Your Post'),
           ],
@@ -192,6 +245,7 @@ class _NotificationPageState extends State<NotificationPage> with SingleTickerPr
       body: TabBarView(
         controller: _tabController,
         children: [
+          _buildAllNotifications(),
           _buildYourClaims(),
           _buildClaimsOnYourPost(),
         ],

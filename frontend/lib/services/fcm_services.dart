@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 class FCMService {
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
-  // 🔹 Initialize FCM (call after login)
   static Future<void> initializeFCM(String userId, String accessToken) async {
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
@@ -22,11 +21,12 @@ class FCMService {
     print("🔑 FCM Token: $token");
 
     if (token != null) {
-      await sendTokenToServer(token, accessToken); // ← Call here
+      await sendTokenToServer(token, accessToken);
     }
 
     FirebaseMessaging.onMessage.listen((message) {
       print("📩 Foreground notification: ${message.notification?.title}");
+      _showForegroundNotification(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
@@ -34,7 +34,6 @@ class FCMService {
     });
   }
 
-  // 🔹 Send FCM token to backend
   static Future<void> sendTokenToServer(String token, String accessToken) async {
     final res = await http.post(
       Uri.parse("https://vetau.onrender.com/api/v1/users/fcm-token"),
@@ -46,5 +45,9 @@ class FCMService {
     );
 
     print("FCM token saved: ${res.body}");
+  }
+
+  static void _showForegroundNotification(RemoteMessage message) {
+    print("📲 Showing foreground notification: ${message.notification?.title}");
   }
 }

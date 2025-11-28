@@ -28,7 +28,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    Future.microtask(() => ref.read(postsProvider.notifier).fetchPosts());
+    Future.microtask(() async => await ref.read(postsProvider.notifier).fetchPosts());
   }
 
   @override
