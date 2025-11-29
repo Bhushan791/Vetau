@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/pages/detail_home.dart';
 import 'package:frontend/pages/home.dart';
+import 'package:frontend/components/searchAppBar.dart';
 import 'package:http/http.dart' as http;
 
 class SearchResults extends StatefulWidget {
@@ -59,52 +60,46 @@ class _SearchResultsState extends State<SearchResults> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text('Results for "$currentQuery"'),
-        backgroundColor: Colors.white,
-        elevation: 1,
+      appBar: SearchAppBar(
+        controller: _searchController,
+        onSubmitted: (value) {
+          if (value.trim().isNotEmpty) {
+            setState(() {
+              currentQuery = value.trim();
+            });
+            fetchSearchResults();
+          }
+        },
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: Colors.grey),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: "Search for lost pets, services...",
-                        border: InputBorder.none,
-                      ),
-                      onSubmitted: (value) {
-                        if (value.trim().isNotEmpty) {
-                          setState(() {
-                            currentQuery = value.trim();
-                          });
-                          fetchSearchResults();
-                        }
-                      },
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Chip(
+                          label: const Text('Pro Tip: Color + Item + Location = Best results',
+                              style: TextStyle(fontSize: 14)),
+                          backgroundColor: Colors.grey.shade100,
+                          side: BorderSide.none,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : posts.isEmpty
-              ? const Center(child: Text("No results found"))
+              ? const Center(child: Text("No results found", style: TextStyle(fontSize: 16)))
               : RefreshIndicator(
                   onRefresh: fetchSearchResults,
                   child: ListView.builder(
