@@ -6,7 +6,7 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Chat } from "../models/chat.model.js";
 import { v4 as uuidv4 } from "uuid";
-import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 NEW IMPORT
+import { sendPushNotification } from "../utils/sendNotification.js";
 
 // ============================================
 // CLAIM CONTROLLERS
@@ -78,6 +78,7 @@ const createClaim = asyncHandler(async (req, res) => {
           body: `${req.user.fullName} claimed your ${post.type} post`,
         },
         {
+          userId: postOwner._id,
           type: "claim",
           postId: post.postId,
           claimId: claim.claimId,
@@ -292,11 +293,10 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
   await claim.save();
 
   // If accepted, update post status to "claimed" and create chat
-  if (status === "accepted") {
+// ✅ CORRECT - Only create chat, DON'T change post status
+if (status === "accepted") {
     const post = await Post.findById(claim.postId._id);
-    post.status = "claimed";
-    await post.save();
-
+    
     // CREATE CHAT SESSION between post owner and claimer
     const existingChat = await Chat.findOne({
       postId: post._id,
@@ -315,32 +315,9 @@ const updateClaimStatus = asyncHandler(async (req, res) => {
       });
     }
 
-    // ============================================
-    // 🔔 SEND NOTIFICATION TO CLAIMER (NEW)
-    // ============================================
-    const claimer = await User.findById(claim.claimerId);
-
-    if (claimer && claimer.fcmToken) {
-      try {
-        await sendPushNotification(
-          claimer.fcmToken,
-          {
-            title: "Claim Accepted!",
-            body: `Your claim on "${post.itemName}" was accepted`,
-          },
-          {
-            type: "claim_accepted",
-            postId: post.postId,
-            chatId: chat.chatId, // So they can open chat directly
-          }
-        );
-      } catch (error) {
-        console.error("Failed to send claim accepted notification:", error);
-        // Don't throw error, notification failure shouldn't block status update
-      }
-    }
-    // ============================================
-  }
+    // ✅ DON'T CHANGE POST STATUS HERE
+    // Post owner will manually change it via updatePostStatus endpoint
+}
 
   // Populate claim details
   const updatedClaim = await Claim.findById(claim._id)

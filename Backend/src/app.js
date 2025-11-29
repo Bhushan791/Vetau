@@ -37,6 +37,7 @@ import chatRouter from "./routes/chat.routes.js";
 import messageRouter from "./routes/message.routes.js";
 import commentRouter from "./routes/comment.routes.js";
 import savedPostRoutes from "./routes/savedPost.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 //routes decleration 
 app.use("/api/v1/users", userRouter)
@@ -47,11 +48,14 @@ app.use("/api/v1/chats", chatRouter);
 app.use("/api/v1/messages", messageRouter);
 app.use("/api/v1/comments", commentRouter);
 app.use("/api/v1/saved-posts", savedPostRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 
 
 
-
+// ADMIN
+import adminRoutes from "./routes/admin/adminRoutes.js";
+app.use("/api/v1/admin", adminRoutes);
 
 //Error handler withjson response
 app.use(errorHandler);

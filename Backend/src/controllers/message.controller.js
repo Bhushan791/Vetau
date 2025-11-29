@@ -117,6 +117,7 @@ const sendMessage = asyncHandler(async (req, res) => {
             body: messageType === "text" ? content : "📷 Sent an image",
           },
           {
+            userId: otherUser._id, 
             type: "message",
             chatId: chat.chatId,
             messageId: message.messageId,

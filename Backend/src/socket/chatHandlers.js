@@ -25,7 +25,19 @@ export const handleChatEvents = (io, socket) => {
       socket.join(chatId);
       socket.emit("joined_chat", { chatId });
       
-      console.log(`👥 ${socket.user.fullName} joined chat: ${chatId}`);
+      console.log(`💥 ${socket.user.fullName} joined chat: ${chatId}`);
+    } catch (error) {
+      socket.emit("error", { message: error.message });
+    }
+  });
+
+  // Leave chat room
+  socket.on("leave_chat", async (data) => {
+    try {
+      const { chatId } = data;
+      socket.leave(chatId);
+      socket.emit("left_chat", { chatId });
+      console.log(`👋 ${socket.user.fullName} left chat: ${chatId}`);
     } catch (error) {
       socket.emit("error", { message: error.message });
     }
@@ -81,14 +93,14 @@ export const handleChatEvents = (io, socket) => {
       // ✅ FORMAT SENDER BASED ON ANONYMOUS STATUS
       // ============================================
       let senderName = message.senderId.fullName;
-      let senderProfileImage = message.senderId.profileImage; // ✅ NEW
+      let senderProfileImage = message.senderId.profileImage;
 
       if (
         chat.postId.isAnonymous &&
         chat.postId.userId.toString() === message.senderId._id.toString()
       ) {
         senderName = message.senderId.username || message.senderId.fullName;
-        senderProfileImage = ANONYMOUS_PROFILE_PIC; // ✅ USE ANONYMOUS PIC
+        senderProfileImage = ANONYMOUS_PROFILE_PIC;
       }
       // ============================================
 
@@ -98,7 +110,7 @@ export const handleChatEvents = (io, socket) => {
         sender: {
           _id: message.senderId._id,
           fullName: senderName,
-          profileImage: senderProfileImage, // ✅ USE FORMATTED PROFILE IMAGE
+          profileImage: senderProfileImage,
         },
         content: message.content,
         media: message.media,
@@ -132,5 +144,16 @@ export const handleChatEvents = (io, socket) => {
     socket.to(data.chatId).emit("user_stop_typing", {
       chatId: data.chatId,
     });
+  });
+
+  // Cleanup on disconnect - auto leave all chat rooms
+  socket.on("disconnecting", () => {
+    const chatRooms = Array.from(socket.rooms).filter(
+      room => room !== socket.id && room !== socket.user._id.toString()
+    );
+    
+    if (chatRooms.length > 0) {
+      console.log(`🧹 Cleaning up ${chatRooms.length} chat rooms for ${socket.user.fullName}`);
+    }
   });
 };

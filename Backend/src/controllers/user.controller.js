@@ -8,8 +8,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import passport from "../config/passport.js";
 import fs from "fs";
-import path from "path";
-import brevo from '@getbrevo/brevo';  
+import brevo from '@getbrevo/brevo';
 
 // ============================================
 // HELPER FUNCTIONS
@@ -91,7 +90,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // Check for existing user by email (if provided)
     if (email) {
-      const existingUserByEmail = await User.findOne({ email: email.toLowerCase() });
+      const existingUserByEmail = await User.findOne({ 
+        email: email.toLowerCase(),
+        isDeleted: false // ✅ Only check active users
+      });
       if (existingUserByEmail) {
         throw new ApiError(409, "User with this email already exists");
       }
@@ -99,7 +101,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // Check for existing username (if provided)
     if (username) {
-      const existingUserByUsername = await User.findOne({ username: username.toLowerCase() });
+      const existingUserByUsername = await User.findOne({ 
+        username: username.toLowerCase(),
+        isDeleted: false // ✅ Only check active users
+      });
       if (existingUserByUsername) {
         throw new ApiError(409, "Username already taken");
       }
@@ -152,22 +157,40 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, username, password } = req.body;
 
+
+  console.log("**************LOGIN HIT***********")
   // Validate input - need at least email OR username
   if (!username && !email) {
     throw new ApiError(400, "Username or email is required");
   }
 
   // Build query to find user
-  const query = {};
+  const query = { isDeleted: false }; // ✅ Only find active users
   if (email) query.email = email.toLowerCase();
   if (username) query.username = username.toLowerCase();
 
   // Find user
   const user = await User.findOne(
-    email && username ? { $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] } : query
+    email && username 
+      ? { $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }], isDeleted: false } 
+      : query
   );
 
   if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // ============================================
+  // ✅ CHECK IF USER IS BANNED
+  // ============================================
+  if (user.status === "banned") {
+    throw new ApiError(403, "Your account has been banned. Please contact support.");
+  }
+
+  // ============================================
+  // ✅ CHECK IF USER IS SOFT-DELETED (extra safety)
+  // ============================================
+  if (user.isDeleted) {
     throw new ApiError(404, "User does not exist");
   }
 
@@ -187,6 +210,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // Get user data without sensitive fields
   const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+  
+
 
   const options = { httpOnly: true, secure: true };
 
@@ -298,7 +323,8 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
   if (username) {
     const existingUser = await User.findOne({ 
       username: username.toLowerCase(),
-      _id: { $ne: req.user._id } 
+      _id: { $ne: req.user._id },
+      isDeleted: false // ✅ Only check active users
     });
     if (existingUser) {
       throw new ApiError(409, "Username already taken");
@@ -347,16 +373,22 @@ const updateUserProfileImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, "Profile image updated successfully"));
 });
 
+// ============================================
+// ✅ SOFT DELETE ACCOUNT (CHANGED FROM HARD DELETE)
+// ============================================
 const deleteAccount = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
 
-  const user = await User.findById(userId);
-  if (user.profileImage) {
-    const publicId = user.profileImage.split('/').pop().split('.')[0];
-    await deleteFromCloudinary(publicId);
-  }
-
-  await User.findByIdAndDelete(userId);
+  // Soft delete the user
+  await User.findByIdAndUpdate(
+    userId,
+    { 
+      isDeleted: true, 
+      deletedAt: new Date(),
+      refreshToken: undefined // Clear refresh token
+    },
+    { new: true }
+  );
 
   const options = { httpOnly: true, secure: true };
 
@@ -408,7 +440,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is required");
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ 
+    email: email.toLowerCase(),
+    isDeleted: false // ✅ Only active users can reset password
+  });
 
   if (!user) {
     throw new ApiError(404, "User with this email does not exist");
@@ -446,7 +481,10 @@ const verifyPasswordResetOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email and OTP are required");
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ 
+    email: email.toLowerCase(),
+    isDeleted: false // ✅ Only active users
+  });
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -482,7 +520,10 @@ const resetPasswordWithOTP = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email and new password are required");
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ 
+    email: email.toLowerCase(),
+    isDeleted: false // ✅ Only active users
+  });
 
   if (!user) {
     throw new ApiError(404, "User not found");
@@ -504,7 +545,7 @@ const resetPasswordWithOTP = asyncHandler(async (req, res) => {
 });
 
 // ============================================
-// 🔔 FCM TOKEN MANAGEMENT (NEW)
+// 🔔 FCM TOKEN MANAGEMENT
 // ============================================
 
 const saveFCMToken = asyncHandler(async (req, res) => {
@@ -542,5 +583,5 @@ export {
   forgotPassword,
   verifyPasswordResetOTP,
   resetPasswordWithOTP,
-  saveFCMToken, // 🆕 NEW EXPORT
+  saveFCMToken,
 };

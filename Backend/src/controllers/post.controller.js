@@ -8,8 +8,7 @@ import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { filterPostsByDistance } from "../utils/locationHelper.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
-import { formatPostWithAnonymous } from "../utils/userHelper.js"; 
-
+import { formatPostWithAnonymous } from "../utils/userHelper.js";
 
 // ============================================
 // CREATE POST
@@ -164,27 +163,30 @@ const createPost = asyncHandler(async (req, res) => {
     throw error;
   }
 });
+
 // ============================================
-// GET ALL POSTS WITH FILTERS
+// ✅ GET ALL POSTS WITH FILTERS (UPDATED)
 // ============================================
 const getAllPosts = asyncHandler(async (req, res) => {
   const {
     type,
     category,
-    categories, // NEW: Multiple categories (comma-separated)
+    categories, // Multiple categories (comma-separated)
     status,
     search,
     nearMe,
     latitude,
     longitude,
     radius = 7,
-    highReward, // NEW: Filter rewards >= 2000
+    highReward, // Filter rewards >= 2000
     page = 1,
     limit = 10,
   } = req.query;
 
   // Build filter
-  const filter = {};
+  const filter = {
+    isDeleted: false, // ✅ EXCLUDE SOFT-DELETED POSTS
+  };
 
   // Type filter
   if (type) filter.type = type;
@@ -237,7 +239,7 @@ const getAllPosts = asyncHandler(async (req, res) => {
   const paginatedPosts = finalPosts.slice(skip, skip + parseInt(limit));
 
   // Format response (hide user info if anonymous)
-const formattedPosts = paginatedPosts.map((post) => formatPostWithAnonymous(post));
+  const formattedPosts = paginatedPosts.map((post) => formatPostWithAnonymous(post));
 
   return res.status(200).json(
     new ApiResponse(
@@ -257,21 +259,21 @@ const formattedPosts = paginatedPosts.map((post) => formatPostWithAnonymous(post
 });
 
 // ============================================
-// GET POST BY ID
+// ✅ GET POST BY ID (UPDATED)
 // ============================================
 const getPostById = asyncHandler(async (req, res) => {
   const { postId } = req.params;
 
-  const post = await Post.findOne({ postId }).populate(
-    "userId",
-    "fullName username email profileImage"
-  );
+  const post = await Post.findOne({ 
+    postId,
+    isDeleted: false // ✅ EXCLUDE SOFT-DELETED POSTS
+  }).populate("userId", "fullName username email profileImage");
 
   if (!post) {
     throw new ApiError(404, "Post not found");
   }
 
-const postObj = formatPostWithAnonymous(post);
+  const postObj = formatPostWithAnonymous(post);
 
   return res
     .status(200)
@@ -279,12 +281,16 @@ const postObj = formatPostWithAnonymous(post);
 });
 
 // ============================================
-// GET MY POSTS
+// ✅ GET MY POSTS (UPDATED)
 // ============================================
 const getMyPosts = asyncHandler(async (req, res) => {
   const { type, status, page = 1, limit = 10 } = req.query;
 
-  const filter = { userId: req.user._id };
+  const filter = { 
+    userId: req.user._id,
+    isDeleted: false // ✅ EXCLUDE SOFT-DELETED POSTS
+  };
+  
   if (type) filter.type = type;
   if (status) filter.status = status;
 
@@ -323,7 +329,10 @@ const updatePost = asyncHandler(async (req, res) => {
     const { postId } = req.params;
     const { description, location, rewardAmount, tags } = req.body;
 
-    const post = await Post.findOne({ postId });
+    const post = await Post.findOne({ 
+      postId,
+      isDeleted: false // ✅ Cannot update soft-deleted posts
+    });
 
     if (!post) {
       throw new ApiError(404, "Post not found");
@@ -415,7 +424,10 @@ const updatePostStatus = asyncHandler(async (req, res) => {
     );
   }
 
-  const post = await Post.findOne({ postId });
+  const post = await Post.findOne({ 
+    postId,
+    isDeleted: false // ✅ Cannot update soft-deleted posts
+  });
 
   if (!post) {
     throw new ApiError(404, "Post not found");
@@ -434,12 +446,15 @@ const updatePostStatus = asyncHandler(async (req, res) => {
 });
 
 // ============================================
-// DELETE POST
+// ✅ DELETE POST (SOFT DELETE - CHANGED FROM HARD DELETE)
 // ============================================
 const deletePost = asyncHandler(async (req, res) => {
   const { postId } = req.params;
 
-  const post = await Post.findOne({ postId });
+  const post = await Post.findOne({ 
+    postId,
+    isDeleted: false // ✅ Prevent double-deletion
+  });
 
   if (!post) {
     throw new ApiError(404, "Post not found");
@@ -449,7 +464,15 @@ const deletePost = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to delete this post");
   }
 
-  await Post.findOneAndDelete({ postId });
+  // ✅ SOFT DELETE: Set isDeleted flag instead of removing from DB
+  await Post.findOneAndUpdate(
+    { postId },
+    { 
+      isDeleted: true, 
+      deletedAt: new Date() 
+    },
+    { new: true }
+  );
 
   return res
     .status(200)

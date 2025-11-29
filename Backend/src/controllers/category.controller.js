@@ -1,4 +1,5 @@
 import { Category } from "../models/category.model.js";
+import { Post } from "../models/post.model.js"; // Import Post model
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -41,7 +42,7 @@ const createCategory = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Get all categories
+ * @desc    Get all categories with post count
  * @route   GET /api/v1/categories
  * @access  Public
  */
@@ -54,17 +55,48 @@ const getAllCategories = asyncHandler(async (req, res) => {
     filter.isActive = isActive === "true";
   }
 
+  // Fetch categories
   const categories = await Category.find(filter).sort({ name: 1 });
+
+  // Get post counts grouped by category NAME (not categoryId)
+  // Because Post model stores category as string (category name)
+  const postCounts = await Post.aggregate([
+    {
+      $match: {
+        isDeleted: false // Only count non-deleted posts
+      }
+    },
+    {
+      $group: {
+        _id: "$category", // Group by category NAME (string field in Post)
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // Create a map of category name to post count
+  const postCountMap = {};
+  postCounts.forEach(item => {
+    postCountMap[item._id] = item.count;
+  });
+
+  // Add postsCount to each category
+  const categoriesWithCount = categories.map(category => {
+    const categoryObj = category.toObject();
+    // Match by category name (both are lowercase)
+    categoryObj.postsCount = postCountMap[category.name] || 0;
+    return categoryObj;
+  });
 
   return res
     .status(200)
     .json(
-      new ApiResponse(200, categories, "Categories fetched successfully")
+      new ApiResponse(200, categoriesWithCount, "Categories fetched successfully")
     );
 });
 
 /**
- * @desc    Get single category by ID
+ * @desc    Get single category by ID with post count
  * @route   GET /api/v1/categories/:categoryId
  * @access  Public
  */
@@ -77,9 +109,19 @@ const getCategoryById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Category not found");
   }
 
+  // Get post count for this specific category by NAME (not categoryId)
+  const postCount = await Post.countDocuments({ 
+    category: category.name, // Match by category name
+    isDeleted: false // Only count non-deleted posts
+  });
+
+  // Add postsCount to category object
+  const categoryObj = category.toObject();
+  categoryObj.postsCount = postCount;
+
   return res
     .status(200)
-    .json(new ApiResponse(200, category, "Category fetched successfully"));
+    .json(new ApiResponse(200, categoryObj, "Category fetched successfully"));
 });
 
 /**

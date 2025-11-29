@@ -13,7 +13,6 @@ import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 NEW
 const addComment = asyncHandler(async (req, res) => {
   const { postId, content, parentCommentId } = req.body;
 
-  // Validation
   if (!postId) {
     throw new ApiError(400, "Post ID is required");
   }
@@ -26,23 +25,21 @@ const addComment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Comment cannot exceed 500 characters");
   }
 
-  // Check if post exists
   const post = await Post.findOne({ postId });
   if (!post) {
     throw new ApiError(404, "Post not found");
   }
 
   let parentCommentObjectId = null;
+  let parentComment = null;
 
-  // Handle reply logic
   if (parentCommentId) {
-    const parentComment = await Comment.findOne({ commentId: parentCommentId });
+    parentComment = await Comment.findOne({ commentId: parentCommentId }).populate('userId');
 
     if (!parentComment) {
       throw new ApiError(404, "Parent comment not found");
     }
 
-    // Check if parent comment belongs to the same post
     if (parentComment.postId.toString() !== post._id.toString()) {
       throw new ApiError(400, "Parent comment does not belong to this post");
     }
@@ -50,7 +47,6 @@ const addComment = asyncHandler(async (req, res) => {
     parentCommentObjectId = parentComment._id;
   }
 
-  // Create comment
   const comment = await Comment.create({
     postId: post._id,
     userId: req.user._id,
@@ -58,40 +54,91 @@ const addComment = asyncHandler(async (req, res) => {
     parentCommentId: parentCommentObjectId,
   });
 
-  // Increment post's totalComments counter
   post.totalComments = (post.totalComments || 0) + 1;
   await post.save();
 
   // ============================================
-  // 🔔 SEND NOTIFICATION TO POST OWNER (NEW)
+  // 🔔 NOTIFICATIONS
   // ============================================
-  // Only notify if commenter is NOT the post owner
-  if (post.userId.toString() !== req.user._id.toString()) {
+  
+  if (parentCommentId && parentComment) {
+    // CASE 2: Reply to comment - notify BOTH post owner and comment owner
     const postOwner = await User.findById(post.userId);
-    
-    if (postOwner && postOwner.fcmToken) {
+    const commentOwner = parentComment.userId; // Already populated
+
+    const usersToNotify = [];
+
+    // Add post owner (if not the replier)
+    if (post.userId.toString() !== req.user._id.toString()) {
+      usersToNotify.push({
+        fcmToken: postOwner.fcmToken,
+        userId: postOwner._id,
+        extraData: {
+          postId: post.postId,
+          commentId: comment.commentId,
+        }
+      });
+    }
+
+    // Add comment owner (if not the replier AND different from post owner)
+    if (
+      commentOwner._id.toString() !== req.user._id.toString() &&
+      commentOwner._id.toString() !== post.userId.toString()
+    ) {
+      usersToNotify.push({
+        fcmToken: commentOwner.fcmToken,
+        userId: commentOwner._id,
+        extraData: {
+          postId: post.postId,
+          commentId: comment.commentId,
+        }
+      });
+    }
+
+    // Send to multiple users
+    if (usersToNotify.length > 0) {
       try {
-        await sendPushNotification(
-          postOwner.fcmToken,
+        await sendMultipleNotifications(
+          usersToNotify,
           {
-            title: "New Comment",
-            body: `${req.user.fullName} commented on your post`,
+            title: "New Reply",
+            body: `${req.user.fullName} replied to a comment`,
           },
-          {
-            type: "comment",
-            postId: post.postId,
-            commentId: comment.commentId,
-          }
+          "comment"
         );
       } catch (error) {
-        console.error("Failed to send comment notification:", error);
-        // Don't throw error, notification failure shouldn't block comment creation
+        console.error("Failed to send reply notifications:", error);
+      }
+    }
+
+  } else {
+    // CASE 1: Direct comment - notify only post owner
+    if (post.userId.toString() !== req.user._id.toString()) {
+      const postOwner = await User.findById(post.userId);
+      
+      if (postOwner && postOwner.fcmToken) {
+        try {
+          await sendPushNotification(
+            postOwner.fcmToken,
+            {
+              title: "New Comment",
+              body: `${req.user.fullName} commented on your post`,
+            },
+            {
+              userId: postOwner._id,  // ✅ ADDED
+              type: "comment",
+              postId: post.postId,
+              commentId: comment.commentId,
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send comment notification:", error);
+        }
       }
     }
   }
   // ============================================
 
-  // Populate user details
   const populatedComment = await Comment.findById(comment._id).populate(
     "userId",
     "fullName username profileImage"
