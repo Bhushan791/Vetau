@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'token_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UnauthorizedException implements Exception {
   final String message;
@@ -35,6 +36,14 @@ class ApiClient extends http.BaseClient {
         _cookies[cookie.name] = cookie.value;
         print('🍪 Loaded cookie from storage: ${cookie.name}=${cookie.value}');
       }
+      
+      // Also load refresh token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('refresh_token');
+      if (refreshToken != null) {
+        _cookies['refreshToken'] = refreshToken;
+        print('🍪 Loaded refresh token from SharedPreferences');
+      }
     } catch (e) {
       print('❌ Error loading cookies from storage: $e');
     }
@@ -50,7 +59,7 @@ class ApiClient extends http.BaseClient {
     // Check if access token is expired
     if (await tokenService.isAccessTokenExpired()) {
       print('🔄 Access token expired, refreshing...');
-      if (_cookies.isEmpty) {
+      if (!_cookies.containsKey('refreshToken')) {
         print('❌ No refresh token available, clearing session');
         await tokenService.clearAccessToken();
         throw UnauthorizedException('Session expired. Please login again.');
@@ -140,8 +149,15 @@ class ApiClient extends http.BaseClient {
       for (final cookie in cookies) {
         final parts = cookie.split(';')[0].split('=');
         if (parts.length == 2) {
-          _cookies[parts[0].trim()] = parts[1].trim();
-          print('🍪 Stored cookie: ${parts[0].trim()}=${parts[1].trim()}');
+          final cookieName = parts[0].trim();
+          final cookieValue = parts[1].trim();
+          _cookies[cookieName] = cookieValue;
+          print('🍪 Stored cookie: $cookieName=$cookieValue');
+          
+          // Save refresh token to SharedPreferences
+          if (cookieName == 'refreshToken') {
+            _saveRefreshTokenToPrefs(cookieValue);
+          }
         }
       }
       
@@ -149,6 +165,17 @@ class ApiClient extends http.BaseClient {
       _saveCookiesToStorage(setCookieHeaders);
     } else {
       print('🍪 No set-cookie header in response');
+    }
+  }
+  
+  /// Save refresh token to SharedPreferences
+  Future<void> _saveRefreshTokenToPrefs(String refreshToken) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('refresh_token', refreshToken);
+      print('🍪 Refresh token saved to SharedPreferences');
+    } catch (e) {
+      print('❌ Error saving refresh token: $e');
     }
   }
 

@@ -160,6 +160,15 @@ class _LoginPageState extends State<LoginPage> {
         if (response.headers.containsKey('set-cookie')) {
           final cookieHeader = response.headers['set-cookie']!;
           await CookieStorage.saveCookies(uri, [cookieHeader]);
+          
+          // Extract and save refresh token to SharedPreferences
+          final refreshTokenMatch = RegExp(r'refreshToken=([^;]+)').firstMatch(cookieHeader);
+          if (refreshTokenMatch != null) {
+            final refreshToken = refreshTokenMatch.group(1)!;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('refresh_token', refreshToken);
+            print("🍪 Refresh token saved to SharedPreferences");
+          }
           print("🍪 Refresh token cookie saved");
         }
 
