@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/components/edit_profile_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -24,8 +25,10 @@ class CurvedBottomClipper extends CustomClipper<Path> {
     final endPoint = Offset(size.width, size.height - 30);
     
     path.quadraticBezierTo(
-      controlPoint.dx, controlPoint.dy,
-      endPoint.dx, endPoint.dy,
+      controlPoint.dx,
+      controlPoint.dy,
+      endPoint.dx,
+      endPoint.dy,
     );
     
     path.lineTo(size.width, 0);
@@ -48,7 +51,7 @@ class _EditprofileState extends State<Editprofile> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _usernameController = TextEditingController();
   
   String _profileImage = '';
@@ -67,7 +70,7 @@ class _EditprofileState extends State<Editprofile> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
+    _addressController.dispose();
     _usernameController.dispose();
     super.dispose();
   }
@@ -90,14 +93,15 @@ class _EditprofileState extends State<Editprofile> {
         final data = json.decode(response.body)['data'];
         _nameController.text = data['fullName'] ?? '';
         _emailController.text = data['email'] ?? '';
-        _phoneController.text = data['address'] ?? '';
-        _usernameController.text = 'LunivaUser';
+        _addressController.text = data['address'] ?? '';
+        _usernameController.text = data['username'] ?? '';
         _profileImage = data['profileImage'] ?? '';
       } else {
         throw Exception('Failed to load user data');
       }
     } catch (e) {
       print('❌ Error loading user data: $e');
+      _showErrorSnackBar('Failed to load user data');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -176,7 +180,9 @@ class _EditprofileState extends State<Editprofile> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Upload Profile Image'),
-          content: const Text('Do you want to upload this image as your profile picture?'),
+          content: const Text(
+            'Do you want to upload this image as your profile picture?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -187,8 +193,13 @@ class _EditprofileState extends State<Editprofile> {
                 Navigator.of(context).pop();
                 _updateProfileImage();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
-              child: const Text('Upload', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+              ),
+              child: const Text(
+                'Upload',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -230,36 +241,140 @@ class _EditprofileState extends State<Editprofile> {
       print("BODY: $body");
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profile image updated!")),
-        );
+        final data = json.decode(body)['data'];
+        setState(() {
+          _profileImage = data['profileImage'] ?? '';
+          _selectedImage = null;
+        });
+        _showSuccessSnackBar("Profile image updated successfully");
       } else {
-        print(body);
-        throw Exception("Upload failed");
+        String errorMessage = "Failed to update profile image";
+        try {
+          final errorJson = json.decode(body);
+          errorMessage = errorJson["message"] ?? errorMessage;
+        } catch (_) {}
+        _showErrorSnackBar(errorMessage);
       }
     } catch (e) {
       print("ERROR: $e");
+      _showErrorSnackBar("Error uploading profile image");
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  void _saveChanges() {
-    if (_formKey.currentState!.validate()) {
-      print('=== FORM SUBMISSION ===');
-      print('Name: ${_nameController.text}');
-      print('Email: ${_emailController.text}');
-      print('Phone: ${_phoneController.text}');
-      print('Username: ${_usernameController.text}');
-      print('Profile Image: $_profileImage');
-      print('=====================');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Changes saved successfully!'),
-          backgroundColor: Colors.green,
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
         ),
+        backgroundColor: Colors.red.shade400,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green.shade400,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _saveChanges() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? "";
+
+      final updateFields = <String, dynamic>{};
+      
+      if (_nameController.text.isNotEmpty) {
+        updateFields['fullName'] = _nameController.text.trim();
+      }
+      if (_addressController.text.isNotEmpty) {
+        updateFields['address'] = _addressController.text.trim();
+      }
+      if (_usernameController.text.isNotEmpty) {
+        updateFields['username'] = _usernameController.text.trim();
+      }
+
+      if (updateFields.isEmpty) {
+        _showErrorSnackBar("Please update at least one field");
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final response = await http.patch(
+        Uri.parse('$apiBaseUrl/users/update-account/'),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: json.encode(updateFields),
       );
+
+      print("Response Status: ${response.statusCode}");
+      print("Response Body: ${response.body}");
+
+      setState(() => _isLoading = false);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        setState(() {
+          _nameController.text = data['fullName'] ?? '';
+          _addressController.text = data['address'] ?? '';
+          _usernameController.text = data['username'] ?? '';
+        });
+        _showSuccessSnackBar("Account details updated successfully");
+      } else {
+        String errorMessage = "Failed to update account details";
+        try {
+          final errorJson = json.decode(response.body);
+          errorMessage = errorJson["message"] ?? errorMessage;
+        } catch (_) {}
+        _showErrorSnackBar(errorMessage);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      print("ERROR: $e");
+      _showErrorSnackBar("Server error. Please try again later.");
     }
   }
 
@@ -268,7 +383,9 @@ class _EditprofileState extends State<Editprofile> {
     return Scaffold(
       backgroundColor: kScaffoldBackground,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+          ? const Center(
+              child: CircularProgressIndicator(color: kPrimaryColor),
+            )
           : SingleChildScrollView(
               child: Form(
                 key: _formKey,
@@ -346,7 +463,11 @@ class _EditprofileState extends State<Editprofile> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.black,
+                size: 20,
+              ),
             ),
           ),
           const Text(
@@ -384,11 +505,13 @@ class _EditprofileState extends State<Editprofile> {
               child: CircleAvatar(
                 radius: 50,
                 backgroundColor: Colors.grey[300],
-                backgroundImage: _selectedImage != null 
-                    ? FileImage(_selectedImage!) 
-                    : (_profileImage.isNotEmpty ? NetworkImage(_profileImage) : null),
-                child: _selectedImage == null && _profileImage.isEmpty 
-                    ? const Icon(Icons.person, size: 60, color: Colors.grey) 
+                backgroundImage: _selectedImage != null
+                    ? FileImage(_selectedImage!)
+                    : (_profileImage.isNotEmpty
+                        ? NetworkImage(_profileImage)
+                        : null),
+                child: _selectedImage == null && _profileImage.isEmpty
+                    ? const Icon(Icons.person, size: 60, color: Colors.grey)
                     : null,
               ),
             ),
@@ -402,9 +525,16 @@ class _EditprofileState extends State<Editprofile> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey[300]!, width: 2),
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 2,
+                    ),
                   ),
-                  child: const Icon(Icons.edit, size: 16, color: Colors.grey),
+                  child: const Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
             ),
@@ -421,7 +551,7 @@ class _EditprofileState extends State<Editprofile> {
         ),
         const SizedBox(height: 5),
         Text(
-          '${_emailController.text} | ${_phoneController.text}',
+          '${_emailController.text} | ${_addressController.text}',
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey[600],
@@ -464,11 +594,25 @@ class _EditprofileState extends State<Editprofile> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildTextField('Name', _nameController, 'Enter your full name'),
+          EditProfileField(
+            label: 'Full Name',
+            controller: _nameController,
+            hint: 'Enter your full name',
+          ),
           const SizedBox(height: 15),
-          _buildTextField('Email', _emailController, 'Enter your email', keyboardType: TextInputType.emailAddress),
+          EditProfileField(
+            label: 'Email',
+            controller: _emailController,
+            hint: 'Enter your email',
+            keyboardType: TextInputType.emailAddress,
+            readOnly: true,
+          ),
           const SizedBox(height: 15),
-          _buildTextField('Phone Number', _phoneController, 'Enter your phone number', keyboardType: TextInputType.phone),
+          EditProfileField(
+            label: 'Address',
+            controller: _addressController,
+            hint: 'Enter your address',
+          ),
         ],
       ),
     );
@@ -488,10 +632,15 @@ class _EditprofileState extends State<Editprofile> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildTextField('Anonymous Username', _usernameController, 'LunivaUser'),
+          EditProfileField(
+            label: 'Username',
+            controller: _usernameController,
+            hint: 'Enter your username',
+          ),
           const SizedBox(height: 10),
           Text(
-            'This username protects your privacy. It will appear on your anonymous posts instead of your real name.',
+            'This username will appear on your anonymous posts '
+            'instead of your real name.',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
@@ -499,55 +648,6 @@ class _EditprofileState extends State<Editprofile> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller, String hint, {TextInputType? keyboardType}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            filled: true,
-            fillColor: Colors.grey[50],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kPrimaryColor),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'This field is required';
-            }
-            if (label == 'Email' && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Please enter a valid email';
-            }
-            return null;
-          },
-        ),
-      ],
     );
   }
 
