@@ -109,8 +109,22 @@ const Layout = () => {
         {/* USER INFO */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 bg-white">
           <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/70 rounded-xl shadow-sm">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-              {user?.name?.[0]?.toUpperCase() || 'A'}
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold overflow-hidden">
+              {user?.profileImage ? (
+                <img
+                  src={user.profileImage}
+                  alt={user?.name || 'Admin User'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      user?.name || 'Admin User'
+                    )}&background=3b82f6&color=fff`;
+                  }}
+                />
+              ) : (
+                (user?.name?.[0]?.toUpperCase() || 'A')
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
@@ -156,8 +170,22 @@ const Layout = () => {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center gap-3 p-2 hover:bg-gray-100 rounded-lg transition"
                 >
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                    {user?.name?.[0]?.toUpperCase() || 'A'}
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm overflow-hidden">
+                    {user?.profileImage ? (
+                      <img
+                        src={user.profileImage}
+                        alt={user?.name || 'Admin'}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            user?.name || 'Admin'
+                          )}&background=3b82f6&color=fff`;
+                        }}
+                      />
+                    ) : (
+                      (user?.name?.[0]?.toUpperCase() || 'A')
+                    )}
                   </div>
                   <span className="hidden md:block text-sm font-medium text-gray-700">
                     {user?.name || 'Admin'}
@@ -183,7 +211,9 @@ const Layout = () => {
                           <p className="text-sm font-semibold text-gray-900">
                             {user?.name || 'Admin User'}
                           </p>
-                          <p className="text-xs text-gray-500">{user?.email || 'admin@example.com'}</p>
+                          <p className="text-xs text-gray-500">
+                            {user?.email || 'admin@example.com'}
+                          </p>
                         </div>
 
                         <div className="p-2">
