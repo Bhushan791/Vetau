@@ -7,7 +7,7 @@ export const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  isLoading: true, // Start with loading true
+  isLoading: true, 
 
   // Actions
   login: (userData, token) => {
