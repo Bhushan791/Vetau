@@ -40,6 +40,13 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
     }
   }
 
+  String _getDisplayMessage(String lastMessage) {
+    if (lastMessage.contains('📷')) {
+      return '📷 Sent an image';
+    }
+    return lastMessage;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,7 +158,7 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    chat.lastMessage,
+                                    _getDisplayMessage(chat.lastMessage),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

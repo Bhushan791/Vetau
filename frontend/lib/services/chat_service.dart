@@ -29,6 +29,7 @@ class ChatService {
       throw Exception('Failed to load chats: ${response.statusCode}');
     }
   }
+
   static Future<void> sendMessage({
     required String chatId,
     required String content,
@@ -53,34 +54,49 @@ class ChatService {
     }
   }
 
-  static Future<File> _forceConvertToJpg(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final decoded = img.decodeImage(bytes);
-
-      if (decoded == null) {
-        debugPrint("Image decode failed for ${file.path}, using original file.");
-        return file;
-      }
-
-      final jpgBytes = img.encodeJpg(decoded, quality: 85);
-      final newPath = file.path.replaceAll(RegExp(r'\.\w+$'), '.jpg');
-      final jpgFile = File(newPath);
-      await jpgFile.writeAsBytes(jpgBytes, flush: true);
-      debugPrint("Converted ${file.path} -> $newPath");
-      return jpgFile;
-    } catch (e) {
-      debugPrint("Error converting image to JPG: $e");
-      return file;
-    }
-  }
-
   static Future<void> sendImageMessage({
     required String chatId,
     required XFile image,
   }) async {
-    // TODO: Backend endpoint for image messages not implemented yet
-    // The backend needs to add a POST route for /chats/:chatId/messages that accepts multipart/form-data
-    throw Exception('Image sending not supported yet. Backend endpoint needs to be implemented.');
+    try {
+      final tokenService = TokenService();
+      final token = await tokenService.getAccessToken();
+
+      if (token == null) {
+        throw Exception('No access token available');
+      }
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConstants.baseUrl}/messages/'),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      request.fields['chatId'] = chatId;
+      request.fields['messageType'] = 'image';
+
+      final imageFile = File(image.path);
+      request.files.add(
+        http.MultipartFile(
+          'media',
+          imageFile.readAsBytes().asStream(),
+          await imageFile.length(),
+          filename: image.name,
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+
+      final response = await request.send();
+
+      if (response.statusCode != 201) {
+        throw Exception('Failed to send image: ${response.statusCode}');
+      }
+
+      print('✅ Image sent successfully');
+    } catch (e) {
+      print('❌ Error sending image: $e');
+      throw Exception('Failed to send image: $e');
+    }
   }
 }

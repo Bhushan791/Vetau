@@ -2,20 +2,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:frontend/models/message_model.dart';
 
+class ChatMessagesState {
+  final List<MessageModel> messages;
+  final bool isLoading;
+
+  ChatMessagesState({
+    required this.messages,
+    required this.isLoading,
+  });
+
+  ChatMessagesState copyWith({
+    List<MessageModel>? messages,
+    bool? isLoading,
+  }) {
+    return ChatMessagesState(
+      messages: messages ?? this.messages,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+}
+
 /// Family provider because each chat room has separate messages
 final chatMessagesProvider = StateNotifierProvider.family<
-    ChatMessagesNotifier, List<MessageModel>, String>((ref, roomId) {
+    ChatMessagesNotifier, ChatMessagesState, String>((ref, roomId) {
   return ChatMessagesNotifier();
 });
 
-class ChatMessagesNotifier extends StateNotifier<List<MessageModel>> {
+class ChatMessagesNotifier extends StateNotifier<ChatMessagesState> {
   final Set<String> _processedMessageIds = {};
   
-  ChatMessagesNotifier() : super([]);
+  ChatMessagesNotifier() : super(ChatMessagesState(messages: [], isLoading: true));
 
   /// Replace entire message list (used on first load)
   void setMessages(List<MessageModel> messages) {
-    state = messages;
+    state = state.copyWith(messages: messages, isLoading: false);
     _processedMessageIds.clear();
     _processedMessageIds.addAll(messages.map((m) => m.messageId));
   }
@@ -28,17 +48,17 @@ class ChatMessagesNotifier extends StateNotifier<List<MessageModel>> {
     }
     
     _processedMessageIds.add(message.messageId);
-    state = [...state, message];
+    state = state.copyWith(messages: [...state.messages, message]);
   }
 
   /// Insert older messages at the top for pagination
   void insertOlderMessages(List<MessageModel> olderMessages) {
-    state = [...olderMessages, ...state];
+    state = state.copyWith(messages: [...olderMessages, ...state.messages]);
   }
 
   /// Clear messages when leaving chat screen
   void clear() {
-    state = [];
+    state = ChatMessagesState(messages: [], isLoading: true);
     _processedMessageIds.clear();
   }
 }
