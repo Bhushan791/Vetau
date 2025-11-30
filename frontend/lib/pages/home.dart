@@ -6,6 +6,7 @@ import 'package:frontend/components/bottomNav.dart';
 import 'package:frontend/components/filter_component.dart';
 import 'package:frontend/stores/filter_store.dart';
 import 'package:frontend/stores/posts_provider.dart';
+import 'package:frontend/services/socket_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui' as ui;
 
@@ -28,7 +29,22 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    Future.microtask(() async => await ref.read(postsProvider.notifier).fetchPosts());
+    Future.microtask(() async {
+      await ref.read(postsProvider.notifier).fetchPosts();
+      _initializeSocket();
+    });
+  }
+
+  Future<void> _initializeSocket() async {
+    try {
+      if (!SocketService.instance.isConnected) {
+        await SocketService.instance.initSocket();
+        await SocketService.instance.waitForConnection();
+        print('🔧 Socket initialized on home page');
+      }
+    } catch (e) {
+      print('❌ Socket initialization error: $e');
+    }
   }
 
   @override

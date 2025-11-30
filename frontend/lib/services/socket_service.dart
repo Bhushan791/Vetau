@@ -12,11 +12,8 @@ class SocketService {
   io.Socket? socket;
   bool isConnected = false;
 
-
   SocketService._internal();
 
-
-  
   bool get connectionStatus => isConnected && (socket?.connected ?? false);
 
   Future<void> initSocket() async {
@@ -90,6 +87,7 @@ class SocketService {
           socket?.dispose();
           socket = null;
           await initSocket();
+          print('✅ Socket reconnected with new token');
         }
       }
     } catch (e) {
