@@ -11,16 +11,16 @@ class BottomNav extends StatelessWidget {
         Navigator.pushNamed(context, '/home');
         break;
       case 1:
-        Navigator.pushNamed(context, '/search');
+        Navigator.pushNamed(context, '/chats');
         break;
       case 2:
         Navigator.pushNamed(context, '/post');
         break;
       case 3:
-        Navigator.pushNamed(context, '/chats');
+        Navigator.pushNamed(context, '/saved');
         break;
       case 4:
-        Navigator.pushNamed(context, '/more');
+        Navigator.pushNamed(context, '/notifications');
         break;
     }
   }
@@ -28,56 +28,44 @@ class BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
             offset: const Offset(0, -2),
           ),
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _navItem(
-                context: context,
-                icon: Icons.home,
-                label: "Home",
-                index: 0,
-              ),
-              const SizedBox(width: 10),
-              _navItem(
-                context: context,
-                icon: Icons.search,
-                label: "Search",
-                index: 1,
-              ),
-            ],
+          _navItem(
+            context: context,
+            icon: Icons.home,
+            label: "Home",
+            index: 0,
+          ),
+          _navItem(
+            context: context,
+            icon: Icons.chat_bubble_outline,
+            label: "Chat",
+            index: 1,
           ),
           _postButton(context),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _navItem(
-                context: context,
-                icon: Icons.chat_bubble_outline,
-                label: "Chats",
-                index: 3,
-              ),
-              const SizedBox(width: 10),
-              _navItem(
-                context: context,
-                icon: Icons.qr_code,
-                label: "More",
-                index: 4,
-              ),
-            ],
+          _navItem(
+            context: context,
+            icon: Icons.bookmark_outline,
+            label: "Saved",
+            index: 3,
+          ),
+          _navItem(
+            context: context,
+            icon: Icons.notifications_outlined,
+            label: "Notification",
+            index: 4,
           ),
         ],
       ),
@@ -98,7 +86,7 @@ class BottomNav extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               shape: BoxShape.circle,
@@ -124,31 +112,29 @@ class BottomNav extends StatelessWidget {
   }
 
   Widget _postButton(BuildContext context) {
-    final bool isActive = currentIndex == 2;
-
     return GestureDetector(
       onTap: () => _handleNavigation(context, 2),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isActive ? const Color(0xFF2196F3) : Colors.blue,
+              color: Colors.blue,
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.add,
               color: Colors.white,
               size: 28,
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             "Post",
             style: TextStyle(
               fontSize: 12,
-              color: isActive ? Colors.blue : Colors.blue,
+              color: Colors.blue,
               fontWeight: FontWeight.w600,
             ),
           )

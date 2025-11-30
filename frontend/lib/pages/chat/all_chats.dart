@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/components/bottomNav.dart';
+import 'package:frontend/components/homeAppBar.dart';
 import 'package:frontend/pages/chat/chat_page.dart';
 import 'package:frontend/stores/chats_provider.dart';
 import 'package:intl/intl.dart';
@@ -51,18 +52,13 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Chats',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(200),
+        child: HomeAppBar(
+          rewardPoints: 120.76,
+          onNotificationTap: () => Navigator.pushNamed(context, '/notifications'),
+          onProfileTap: () => Navigator.pushNamed(context, '/profile'),
         ),
-        automaticallyImplyLeading: false,
       ),
       body: Consumer(
         builder: (context, ref, child) {
@@ -192,7 +188,7 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
           );
         },
       ),
-      bottomNavigationBar: const BottomNav(currentIndex: 3),
+      bottomNavigationBar: const BottomNav(currentIndex: 1),
     );
   }
 }

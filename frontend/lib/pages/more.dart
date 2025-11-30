@@ -91,7 +91,7 @@ class _MorePageState extends State<MorePage> {
             ],
           ),
         ),
-        bottomNavigationBar: const BottomNav(currentIndex: 4),
+        bottomNavigationBar: const BottomNav(currentIndex: 3),
       ),
     );
   }

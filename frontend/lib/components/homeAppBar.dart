@@ -67,17 +67,17 @@ class _HomeAppBarState extends State<HomeAppBar> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 🔔 Left side: Notification + Vetau text
+          // 🔍 Left side: Search + Vetau text
           Row(
             children: [
               GestureDetector(
-                onTap: widget.onNotificationTap,
+                onTap: () => Navigator.pushNamed(context, '/search'),
                 child: CircleAvatar(
                   radius: 25 * iconScale.clamp(0.8, 1.3),
-                  backgroundColor: Colors.blueAccent,
+                  backgroundColor: Colors.grey.shade300,
                   child: Icon(
-                    Icons.notifications,
-                    color: Colors.white,
+                    Icons.search_outlined,
+                    color: Colors.black,
                     size: 30 * iconScale.clamp(0.8, 1.3),
                   ),
                 ),

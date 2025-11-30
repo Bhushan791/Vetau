@@ -70,6 +70,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/chats': (context) => const ChatsPage(),
+        '/saved': (context) => const MorePage(),
         '/more': (context) => const MorePage(),
         '/post': (context) => const PostPage(),
         '/profile': (context) => const ProfilePage(),

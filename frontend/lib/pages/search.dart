@@ -136,7 +136,7 @@ class _SearchPageState extends State<SearchPage> {
             );
           },
         ),
-        bottomNavigationBar: const BottomNav(currentIndex: 1),
+        bottomNavigationBar: const BottomNav(currentIndex: 0),
       ),
     );
   }

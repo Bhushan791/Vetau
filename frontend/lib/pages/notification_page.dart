@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/stores/notifications_provider.dart';
+import 'package:frontend/components/bottomNav.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -250,6 +251,7 @@ class _NotificationPageState extends ConsumerState<NotificationPage> with Single
           _buildClaimsOnYourPost(),
         ],
       ),
+      bottomNavigationBar: const BottomNav(currentIndex: 4),
     );
   }
 
