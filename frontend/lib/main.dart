@@ -18,6 +18,7 @@ import 'package:frontend/pages/detail_home.dart';
 import 'package:frontend/pages/profile.dart';
 import 'package:frontend/pages/forgotPassword.dart';
 import 'package:frontend/pages/notification_page.dart';
+import 'package:frontend/pages/saved_posts.dart';
 
 // 🔥 Firebase imports
 import 'package:firebase_core/firebase_core.dart';
@@ -70,7 +71,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/search': (context) => const SearchPage(),
         '/chats': (context) => const ChatsPage(),
-        '/saved': (context) => const MorePage(),
+        '/saved': (context) => const SavedPosts(),
         '/more': (context) => const MorePage(),
         '/post': (context) => const PostPage(),
         '/profile': (context) => const ProfilePage(),

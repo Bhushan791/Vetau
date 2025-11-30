@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/pages/editPost.dart';
 import 'package:frontend/stores/like_store.dart';
+import 'package:frontend/stores/saved_posts_provider.dart';
 import 'package:frontend/components/post_header.dart';
 import 'package:frontend/components/post_image.dart';
 import 'package:frontend/components/comment_input.dart';
@@ -123,6 +124,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     final post = postData!;
     final comments = post["comments"] ?? [];
     final user = post["userId"] ?? {};
+    final postIdToUse = post["postId"] ?? post["_id"] ?? "";
 
     // Handle location - can be String or Map
     final location = post["location"];
@@ -226,7 +228,18 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
             children: [
               IconButton(icon: const Icon(Icons.mode_comment_outlined), onPressed: () {}),
               IconButton(icon: const Icon(Icons.share_outlined), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.bookmark_border), onPressed: () {}),
+              Consumer(
+                builder: (context, ref, _) {
+                  final savedPosts = ref.watch(savedPostsProvider);
+                  final isSaved = savedPosts.contains(postIdToUse);
+                  final savingPost = ref.watch(savingPostProvider);
+                  final isSaving = savingPost == postIdToUse;
+                  return IconButton(
+                    icon: isSaving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
+                    onPressed: isSaving ? null : () => _toggleSavePost(ref, postIdToUse),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -382,9 +395,32 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     }
   }
 
-
-
-
+  Future<void> _toggleSavePost(WidgetRef ref, String postId) async {
+    ref.read(savingPostProvider.notifier).state = postId;
+    try {
+      await ref.read(savedPostsProvider.notifier).toggleSavePost(postId);
+      if (mounted) {
+        final isSaved = ref.read(savedPostsProvider).contains(postId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isSaved ? "Post saved successfully" : "Post unsaved"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      ref.read(savingPostProvider.notifier).state = null;
+    }
+  }
 
   @override
   void dispose() {
