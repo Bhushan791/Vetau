@@ -6,12 +6,14 @@ class HomeAppBar extends StatefulWidget {
   final double rewardPoints;
   final VoidCallback? onNotificationTap;
   final VoidCallback? onProfileTap;
+  final Key? refreshKey;
 
   const HomeAppBar({
     super.key,
     this.rewardPoints = 0,
     this.onNotificationTap,
     this.onProfileTap,
+    this.refreshKey,
   });
 
   @override
@@ -25,6 +27,14 @@ class _HomeAppBarState extends State<HomeAppBar> {
   void initState() {
     super.initState();
     _loadProfileImage();
+  }
+
+  @override
+  void didUpdateWidget(HomeAppBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshKey != oldWidget.refreshKey) {
+      _loadProfileImage();
+    }
   }
 
   Future<void> _loadProfileImage() async {

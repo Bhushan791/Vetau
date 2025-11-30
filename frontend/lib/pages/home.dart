@@ -24,6 +24,7 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolling = false;
+  Key _appBarKey = UniqueKey();
 
   @override
   void initState() {
@@ -77,9 +78,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(200),
         child: HomeAppBar(
+          key: _appBarKey,
+          refreshKey: _appBarKey,
           rewardPoints: 120.76,
           onNotificationTap: () => Navigator.pushNamed(context, '/notifications'),
-          onProfileTap: () => Navigator.pushNamed(context, '/profile'),
+          onProfileTap: () async {
+            await Navigator.pushNamed(context, '/profile');
+            setState(() => _appBarKey = UniqueKey());
+          },
         ),
       ),
       body: RefreshIndicator(

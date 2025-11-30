@@ -242,10 +242,12 @@ class _EditprofileState extends State<Editprofile> {
 
       if (response.statusCode == 200) {
         final data = json.decode(body)['data'];
+        final newProfileImage = data['profileImage'] ?? '';
         setState(() {
-          _profileImage = data['profileImage'] ?? '';
+          _profileImage = newProfileImage;
           _selectedImage = null;
         });
+        await prefs.setString('userProfileImage', newProfileImage);
         _showSuccessSnackBar("Profile image updated successfully");
       } else {
         String errorMessage = "Failed to update profile image";
