@@ -63,9 +63,9 @@ class PostsNotifier extends Notifier<PostsState> {
     if (filters.categories.isNotEmpty) params['categories'] = filters.categories.join(',');
     if (filters.highReward) params['highReward'] = 'true';
     if (filters.nearMe && filters.location != null) {
-      params['near_me'] = 'true';
-      params['lat'] = filters.location!.lat.toString();
-      params['lng'] = filters.location!.lng.toString();
+      params['nearMe'] = 'true';
+      params['latitude'] = filters.location!.lat.toString();
+      params['longitude'] = filters.location!.lng.toString();
     }
 
     final uri = Uri.parse("${ApiConstants.baseUrl}/posts");

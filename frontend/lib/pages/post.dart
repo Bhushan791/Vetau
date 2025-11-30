@@ -312,8 +312,16 @@ class _PostPageState extends State<PostPage> {
       request.fields['isAnonymous'] = 'true';
     }
 
-    // Location text only
-    request.fields['location'] = _locationController.text.trim();
+    // Location with coordinates
+    if (_selectedLatLng != null) {
+      request.fields['location'] = jsonEncode({
+        'name': _locationController.text.trim(),
+        'latitude': _selectedLatLng!.latitude,
+        'longitude': _selectedLatLng!.longitude,
+      });
+    } else {
+      request.fields['location'] = _locationController.text.trim();
+    }
 
     // Add images
     for (var xfile in _images) {
