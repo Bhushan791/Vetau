@@ -95,7 +95,11 @@ class _ChatsPageState extends ConsumerState<ChatsPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ChatPage(chatId: chat.chatId),
+                            builder: (_) => ChatPage(
+                              chatId: chat.chatId,
+                              receiverName: chat.otherParticipant.fullName,
+                              receiverImage: chat.otherParticipant.profileImage,
+                            ),
                           ),
                         );
                       },

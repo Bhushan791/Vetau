@@ -10,7 +10,15 @@ import 'package:intl/intl.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String chatId;
-  const ChatPage({super.key, required this.chatId});
+  final String? receiverName;
+  final String? receiverImage;
+  
+  const ChatPage({
+    super.key, 
+    required this.chatId,
+    this.receiverName,
+    this.receiverImage,
+  });
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -24,6 +32,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool isTyping = false;
   String typingUser = '';
   XFile? _selectedImage;
+  String? _selectedMessageId;
 
   @override
   void initState() {
@@ -242,6 +251,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  bool _shouldShowTime(int index, List<MessageModel> messages) {
+    if (index == messages.length - 1) return true;
+    
+    final currentMsg = messages[index];
+    final nextMsg = messages[index + 1];
+    
+    try {
+      final currentTime = DateTime.parse(currentMsg.createdAt.toString());
+      final nextTime = DateTime.parse(nextMsg.createdAt.toString());
+      
+      return nextTime.difference(currentTime).inMinutes >= 60;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(chatMessagesProvider(widget.chatId));
@@ -260,22 +285,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             CircleAvatar(
               radius: 20,
               backgroundColor: Colors.grey[300],
-              child: const Icon(Icons.person, color: Colors.white),
+              backgroundImage: widget.receiverImage != null && widget.receiverImage!.isNotEmpty
+                  ? NetworkImage(widget.receiverImage!)
+                  : null,
+              child: widget.receiverImage == null || widget.receiverImage!.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white)
+                  : null,
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Chat',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+            Text(
+              widget.receiverName ?? 'Chat',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -301,6 +324,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       final showDateHeader = index == 0 || 
                           (index > 0 && _formatDateHeader(message.createdAt.toString()) != 
                            _formatDateHeader(messages[index - 1].createdAt.toString()));
+                      final showTime = _shouldShowTime(index, messages);
 
                       return Column(
                         children: [
@@ -316,74 +340,87 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 ),
                               ),
                             ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                            children: [
-                              if (!isMine) ...[
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: Colors.grey[300],
-                                  child: const Icon(Icons.person, size: 20, color: Colors.white),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              Flexible(
-                                child: Column(
-                                  crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 4),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isMine ? const Color(0xFF5B8DEF) : Colors.white,
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (message.messageType == 'image' && message.media.isNotEmpty)
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(12),
-                                              child: Image.network(
-                                                message.media.first,
-                                                height: 200,
-                                                width: 200,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedMessageId = _selectedMessageId == message.messageId ? null : message.messageId;
+                              });
+                            },
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                              children: [
+                                if (!isMine) ...[
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: Colors.grey[300],
+                                    backgroundImage: message.senderImage.isNotEmpty
+                                        ? NetworkImage(message.senderImage)
+                                        : null,
+                                    child: message.senderImage.isEmpty
+                                        ? const Icon(Icons.person, size: 20, color: Colors.white)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isMine ? const Color(0xFF5B8DEF) : Colors.white,
+                                          borderRadius: BorderRadius.circular(18),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (message.messageType == 'image' && message.media.isNotEmpty)
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.network(
+                                                  message.media.first,
                                                   height: 200,
                                                   width: 200,
-                                                  color: Colors.grey[300],
-                                                  child: const Icon(Icons.error),
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) => Container(
+                                                    height: 200,
+                                                    width: 200,
+                                                    color: Colors.grey[300],
+                                                    child: const Icon(Icons.error),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          if (message.content.isNotEmpty)
-                                            Text(
-                                              message.content,
-                                              style: TextStyle(
-                                                color: isMine ? Colors.white : Colors.black87,
-                                                fontSize: 15,
+                                            if (message.content.isNotEmpty)
+                                              Text(
+                                                message.content,
+                                                style: TextStyle(
+                                                  color: isMine ? Colors.white : Colors.black87,
+                                                  fontSize: 15,
+                                                ),
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-                                      child: Text(
-                                        _formatMessageTime(message.createdAt.toString()),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[600],
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      if (_selectedMessageId == message.messageId || showTime)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+                                          child: Text(
+                                            _formatMessageTime(message.createdAt.toString()),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              if (isMine) const SizedBox(width: 8),
-                            ],
+                                if (isMine) const SizedBox(width: 8),
+                              ],
+                            ),
                           ),
                         ],
                       );
