@@ -9,15 +9,7 @@ import path from "path";
 import { createServer } from "http";
 import { initializeSocket } from "./socket/socket.js";
 import { fileURLToPath } from "url";
-
-// Firebase initializer
 import { initializeFirebase } from "./config/firebase.js";
-
-// ADD: Seed Admin utility
-import { seedAdmin } from "./utils/seedAdmin.js";
-
-// ADD: Import seed database function
-import seedDatabase from "./tempseed.js";
 
 // Ensure temp folder exists
 const tempDir = path.join(process.cwd(), "public/temp");
@@ -33,13 +25,6 @@ connectDB()
   .then(async () => {
     // Initialize Firebase
     initializeFirebase();
-
-    // Run admin seeding
-    await seedAdmin();
-
-    // Run database seeding
-    console.log("\n🌱 Seeding database with test data...");
-    await seedDatabase();
 
     // HTTP server for Socket.IO
     const httpServer = createServer(app);
