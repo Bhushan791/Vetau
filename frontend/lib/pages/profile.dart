@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/api_constants.dart';
+import 'package:frontend/pages/my_posts.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/token_service.dart';
 import 'package:frontend/services/socket_service.dart';
@@ -474,22 +475,26 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
   }
 
-  Widget _buildUserActionsList() {
-    return _buildSectionCard(
-      child: Column(
-        children: [
-          _buildActionRow('Saved Posts', () => print('Saved Posts clicked')),
-          const Divider(height: 1, thickness: 0.5),
-          _buildActionRow('Your Posts', () => print('Your Posts clicked')),
-          const Divider(height: 1, thickness: 0.5),
-          _buildActionRow('Your Contribution', () => print('Your Contribution clicked')),
-          const Divider(height: 1, thickness: 0.5),
-          _buildActionRow('Achievements', () => print('Achievements clicked')),
-        ],
-      ),
-    );
-  }
-
+Widget _buildUserActionsList() {
+  return _buildSectionCard(
+    child: Column(
+      children: [
+        _buildActionRow('Saved Posts', () => print('Saved Posts clicked')),
+        const Divider(height: 1, thickness: 0.5),
+        _buildActionRow('Your Posts', () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MyPostsPage()),
+          );
+        }),
+        const Divider(height: 1, thickness: 0.5),
+        _buildActionRow('Your Contribution', () => print('Your Contribution clicked')),
+        const Divider(height: 1, thickness: 0.5),
+        _buildActionRow('Achievements', () => print('Achievements clicked')),
+      ],
+    ),
+  );
+}
   Widget _buildAccountActionsList() {
     return _buildSectionCard(
       child: Column(
