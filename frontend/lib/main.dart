@@ -23,15 +23,17 @@ import 'package:frontend/pages/saved_posts.dart';
 // 🔥 Firebase imports
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:frontend/services/notification_service.dart';
 
 // GLOBAL NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// 🔥 Background Notification Handler
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(); 
+@pragma( 'vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
   print("Background Notification Received: ${message.notification?.title}");
 }
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +42,7 @@ void main() async {
   await Firebase.initializeApp();
 
   // 🔥 Register background handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   // 🔥 Initialize deep-link listener BEFORE running app
   await AuthLinkHandler.init(() {
@@ -49,6 +51,11 @@ void main() async {
       (route) => false,
     );
   });
+
+  // 🔥 Initialize notification service
+  final notificationService = NotificationService(navigatorKey);
+  notificationService.firebaseInit();
+  await notificationService.setupInteractedMessage();
 
   runApp(const ProviderScope(child: MyApp()));
 }
