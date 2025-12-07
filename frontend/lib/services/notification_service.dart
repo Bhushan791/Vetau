@@ -6,24 +6,26 @@ import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/models/notification_model.dart';
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-
-
 class NotificationService {
   final GlobalKey<NavigatorState> navigatorKey;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
 
   NotificationService(this.navigatorKey) {
     _initLocalNotifications();
   }
 
+  // --------------------------------------------------------------------------
+  // LOCAL NOTIFICATION INIT
+  // --------------------------------------------------------------------------
   void _initLocalNotifications() async {
     const androidSettings = AndroidInitializationSettings("@mipmap/ic_launcher");
     const iosSettings = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(android: androidSettings, iOS: iosSettings);
+    const initSettings =
+        InitializationSettings(android: androidSettings, iOS: iosSettings);
 
     await _localNotifications.initialize(
       initSettings,
@@ -33,6 +35,9 @@ class NotificationService {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // API: FETCH NOTIFICATIONS
+  // --------------------------------------------------------------------------
   static Future<List<NotificationModel>> fetchNotifications() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
@@ -53,6 +58,9 @@ class NotificationService {
     throw Exception('Failed to fetch notifications');
   }
 
+  // --------------------------------------------------------------------------
+  // API: MARK AS READ
+  // --------------------------------------------------------------------------
   static Future<void> markAsRead(String notificationId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
@@ -66,77 +74,75 @@ class NotificationService {
     );
   }
 
-
-
-  //foreground notification handling
-  void firebaseInit(){
+  // --------------------------------------------------------------------------
+  // FOREGROUND NOTIFICATION HANDLING
+  // --------------------------------------------------------------------------
+  void firebaseInit() {
     FirebaseMessaging.onMessage.listen((message) {
       RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
 
-      if(kDebugMode) {
-        print("Foreground Notification Received: ${notification?.title}");
-        print("notification body: ${notification?.body}");
+      if (kDebugMode) {
+        print("🔔 Foreground Notification:");
+        print("Title: ${notification?.title}");
+        print("Body: ${notification?.body}");
       }
 
-      if (Platform.isAndroid){
-        showNotification(message); 
+      // Only show local pop-up in Android
+      if (Platform.isAndroid) {
+        showNotification(message);
       }
     });
   }
 
-  // function to show notification
+  // --------------------------------------------------------------------------
+  // LOCAL POP-UP NOTIFICATION
+  // --------------------------------------------------------------------------
   Future<void> showNotification(RemoteMessage message) async {
-    AndroidNotificationChannel channel = AndroidNotificationChannel(
-    message.notification!.android!.channelId.toString(), 
-    message.notification!.android!.channelId.toString(), 
-    importance: Importance.high,
-    showBadge: true,
-    playSound: true,
-    );
-
-    //android notification details
-    AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      channel.id.toString(),
-      channel.name.toString(),
-      channelDescription: 'This channel is used for important notifications.',
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'default_channel', // static channel
+      'General Notifications',
+      channelDescription: 'Used for showing notifications while app is open',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
-      sound: channel.sound,
-      ticker: 'ticker',
     );
 
-    NotificationDetails notificationDetails = NotificationDetails(android: androidDetails); 
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
 
-
-    //show notification
     await _localNotifications.show(
-      0,
-      message.notification?.title,
-      message.notification?.body,
+      DateTime.now().millisecondsSinceEpoch ~/ 1000, // unique ID
+      message.notification?.title ?? '',
+      message.notification?.body ?? '',
       notificationDetails,
-      payload: 'Notification Payload',
+      payload: 'open_notifications',
     );
   }
 
-  //background and terminated state notification handling
+  // --------------------------------------------------------------------------
+  // BACKGROUND & TERMINATED HANDLING
+  // --------------------------------------------------------------------------
   Future<void> setupInteractedMessage() async {
-   //background state
-   FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    handleMessage(message);
-   });
+    // Background click
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      handleMessage(message);
+    });
 
-   //terminated state
-   FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
-      if (message != null && message.data.isNotEmpty) {
+    // Terminated state
+    FirebaseMessaging.instance
+        .getInitialMessage()
+        .then((RemoteMessage? message) {
+      if (message != null) {
         handleMessage(message);
       }
-   });
+    });
   }
 
-  //handle message
-  Future <void> handleMessage(RemoteMessage message) async{
+  // --------------------------------------------------------------------------
+  // NAVIGATION HANDLER
+  // --------------------------------------------------------------------------
+  Future<void> handleMessage(RemoteMessage message) async {
     navigatorKey.currentState?.pushNamed('/notifications');
-  } 
+  }
 }

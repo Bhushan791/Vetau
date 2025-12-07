@@ -27,13 +27,13 @@ import 'package:frontend/services/notification_service.dart';
 
 // GLOBAL NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final notificationService = NotificationService(navigatorKey);
 
-@pragma( 'vm:entry-point')
+@pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print("Background Notification Received: ${message.notification?.title}");
 }
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +53,6 @@ void main() async {
   });
 
   // 🔥 Initialize notification service
-  final notificationService = NotificationService(navigatorKey);
   notificationService.firebaseInit();
   await notificationService.setupInteractedMessage();
 

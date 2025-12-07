@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:badges/badges.dart' as badges;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/stores/badge_count_provider.dart';
 
-class BottomNav extends StatelessWidget {
+class BottomNav extends ConsumerWidget {
   final int currentIndex;
 
-  const BottomNav({super.key, required this.currentIndex});
+  const BottomNav({
+    super.key,
+    required this.currentIndex,
+  });
 
   void _handleNavigation(BuildContext context, int index) {
     switch (index) {
@@ -26,7 +32,8 @@ class BottomNav extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final badgeCounts = ref.watch(badgeCountProvider);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
@@ -44,12 +51,14 @@ class BottomNav extends StatelessWidget {
         children: [
           _navItem(
             context: context,
+            ref: ref,
             icon: Icons.home,
             label: "Home",
             index: 0,
           ),
           _navItem(
             context: context,
+            ref: ref,
             icon: Icons.chat_bubble_outline,
             label: "Chat",
             index: 1,
@@ -57,12 +66,14 @@ class BottomNav extends StatelessWidget {
           _postButton(context),
           _navItem(
             context: context,
+            ref: ref,
             icon: Icons.bookmark_outline,
             label: "Saved",
             index: 3,
           ),
           _navItem(
             context: context,
+            ref: ref,
             icon: Icons.notifications_outlined,
             label: "Notification",
             index: 4,
@@ -74,27 +85,46 @@ class BottomNav extends StatelessWidget {
 
   Widget _navItem({
     required BuildContext context,
+    required WidgetRef ref,
     required IconData icon,
     required String label,
     required int index,
   }) {
     final bool isActive = index == currentIndex;
+    final badgeCounts = ref.watch(badgeCountProvider);
+    final int badgeCount = index == 1 ? badgeCounts.chatCount : (index == 4 ? badgeCounts.notificationCount : 0);
+    final bool showBadge = index == 1 || index == 4;
 
     return GestureDetector(
       onTap: () => _handleNavigation(context, index),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              shape: BoxShape.circle,
+          badges.Badge(
+            position: badges.BadgePosition.topEnd(top: -10, end: -6),
+            showBadge: showBadge,
+            badgeContent: Text(
+              badgeCount.toString(),
+              style: const TextStyle(color: Colors.white, fontSize: 10),
             ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: isActive ? Colors.blue : Colors.black,
+            badgeAnimation: const badges.BadgeAnimation.scale(
+              animationDuration: Duration(milliseconds: 300),
+            ),
+            badgeStyle: badges.BadgeStyle(
+              badgeColor: Colors.red,
+              padding: const EdgeInsets.all(4),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: isActive ? Colors.blue : Colors.black,
+              ),
             ),
           ),
           const SizedBox(height: 4),
