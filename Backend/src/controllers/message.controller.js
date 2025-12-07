@@ -99,9 +99,8 @@ const sendMessage = asyncHandler(async (req, res) => {
     // ============================================
 
     // ============================================
-    // 🔔 SEND PUSH NOTIFICATION TO OTHER USER (NEW)
+    // 🔔 SEND PUSH NOTIFICATION TO OTHER USER
     // ============================================
-    // Get other participant
     const otherParticipantId = chat.participants.find(
       (p) => p.toString() !== req.user._id.toString()
     );
@@ -113,7 +112,7 @@ const sendMessage = asyncHandler(async (req, res) => {
         await sendPushNotification(
           otherUser.fcmToken,
           {
-            title: senderName, // Use formatted name (anonymous if needed)
+            title: senderName,
             body: messageType === "text" ? content : "📷 Sent an image",
           },
           {
@@ -183,7 +182,6 @@ const sendMessage = asyncHandler(async (req, res) => {
     throw error;
   }
 });
-
 // ============================================
 // MARK MESSAGES AS READ
 // ============================================
