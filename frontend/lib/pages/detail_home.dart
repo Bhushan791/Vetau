@@ -5,8 +5,7 @@ import 'package:frontend/stores/like_store.dart';
 import 'package:frontend/stores/saved_posts_provider.dart';
 import 'package:frontend/components/post_header.dart';
 import 'package:frontend/components/post_image.dart';
-import 'package:frontend/components/comment_input.dart';
-import 'package:frontend/components/comment_item.dart';
+import 'package:frontend/components/comments/comments_section.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -27,7 +26,6 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
   bool isLoading = true;
   bool hasError = false;
   String? loggedInUserId;
-  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
@@ -266,44 +264,10 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                Text("Comments (${comments.length})", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                
-                CommentInput(
-                  controller: _commentController,
-                  onSend: () => _commentController.clear(),
+                CommentsSection(
+                  postId: widget.postId,
+                  initialRawComments: post["comments"],
                 ),
-                const SizedBox(height: 16),
-                
-                if (comments.isNotEmpty)
-                  ...comments.asMap().entries.map((entry) {
-                    final comment = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            child: Text((comment["userId"]?["fullName"]?[0] ?? "U").toUpperCase()),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  comment["userId"]?["fullName"] ?? "Unknown",
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                Text(comment["text"] ?? ""),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
               ],
             ),
           ),
@@ -422,9 +386,5 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     }
   }
 
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
+
 }
