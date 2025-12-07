@@ -1,6 +1,8 @@
 import { Chat } from "../models/chat.model.js";
 import { Message } from "../models/message.model.js";
-import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js"; 
+import { User } from "../models/user.model.js"; // 🆕 Import User model
+import { ANONYMOUS_PROFILE_PIC } from "../utils/userHelper.js";
+import { sendPushNotification } from "../utils/sendNotification.js"; // 🆕 Import FCM function
 
 export const handleChatEvents = (io, socket) => {
   
@@ -101,6 +103,37 @@ export const handleChatEvents = (io, socket) => {
       ) {
         senderName = message.senderId.username || message.senderId.fullName;
         senderProfileImage = ANONYMOUS_PROFILE_PIC;
+      }
+      // ============================================
+
+      // ============================================
+      // 🔔 SEND PUSH NOTIFICATION TO OTHER USER (NEW)
+      // ============================================
+      const otherParticipantId = chat.participants.find(
+        (p) => p.toString() !== socket.user._id.toString()
+      );
+
+      const otherUser = await User.findById(otherParticipantId);
+
+      if (otherUser && otherUser.fcmToken) {
+        try {
+          await sendPushNotification(
+            otherUser.fcmToken,
+            {
+              title: senderName,
+              body: content,
+            },
+            {
+              userId: otherUser._id,
+              type: "message",
+              chatId: chat.chatId,
+              messageId: message.messageId,
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send socket message notification:", error);
+          // Don't throw, notification failure shouldn't block message
+        }
       }
       // ============================================
 
