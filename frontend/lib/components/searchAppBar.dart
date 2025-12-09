@@ -46,7 +46,7 @@ class _SearchAppBarState extends State<SearchAppBar> {
       elevation: 0,
       automaticallyImplyLeading: false,
       leading: Container(
-        margin: const EdgeInsets.all(8),
+        margin: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: Colors.grey.shade200,
           shape: BoxShape.circle,
@@ -57,9 +57,9 @@ class _SearchAppBarState extends State<SearchAppBar> {
           onPressed: widget.onBackPressed ?? () => Navigator.pop(context),
         ),
       ),
+      titleSpacing: 4,
       title: Container(
-        margin: const EdgeInsets.only(left: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),
@@ -72,12 +72,12 @@ class _SearchAppBarState extends State<SearchAppBar> {
               child: TextField(
                 controller: widget.controller,
                 decoration: const InputDecoration(
-                  hintText: "Search items, colors, or locations",
+                  hintText: "Search",
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
-                style: const TextStyle(fontSize: 18),
+                style: const TextStyle(fontSize: 16),
                 onSubmitted: widget.onSubmitted,
               ),
             ),
@@ -86,7 +86,7 @@ class _SearchAppBarState extends State<SearchAppBar> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.only(right: 8),
           child: GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/profile'),
             child: _buildProfileAvatar(),
