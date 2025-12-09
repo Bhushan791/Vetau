@@ -116,7 +116,7 @@ class BottomNav extends ConsumerWidget {
               padding: const EdgeInsets.all(4),
             ),
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 shape: BoxShape.circle,
@@ -124,7 +124,7 @@ class BottomNav extends ConsumerWidget {
               child: HugeIcon(
                 icon: icon,
                 color: isActive ? Colors.blue : Colors.black,
-                size: 24.0,
+                size: 20.0,
               ),
             ),
           ),
@@ -149,7 +149,7 @@ class BottomNav extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.blue,
               shape: BoxShape.circle,
@@ -157,7 +157,7 @@ class BottomNav extends ConsumerWidget {
             child: const HugeIcon(
               icon: HugeIcons.strokeRoundedAdd01,
               color: Colors.white,
-              size: 28.0,
+              size: 22.0,
             ),
           ),
           const SizedBox(height: 4),

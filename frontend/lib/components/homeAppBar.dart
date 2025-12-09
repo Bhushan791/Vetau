@@ -77,77 +77,52 @@ class _HomeAppBarState extends State<HomeAppBar> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 🔍 Left side: Search + Vetau text
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/search'),
-                child: CircleAvatar(
-                  radius: 25 * iconScale.clamp(0.8, 1.3),
-                  backgroundColor: Colors.grey.shade300,
-                  child: Icon(
-                    Icons.search_outlined,
-                    color: Colors.black,
-                    size: 30 * iconScale.clamp(0.8, 1.3),
-                  ),
-                ),
-              ),
-              SizedBox(width: width * 0.015),
-              Text(
-                "Vetau",
-                style: GoogleFonts.kaushanScript(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 30 * fontScale.clamp(0.9, 1.4),
-                ),
-              ),
-            ],
+          // Left side: Vetau Logo
+          Text(
+            "Vetau",
+            style: GoogleFonts.kaushanScript(
+              fontWeight: FontWeight.w600,
+              fontSize: 30 * fontScale.clamp(0.9, 1.4),
+            ),
           ),
 
-          // 🌞 Right side: Karma Pill + Profile Icon
+          // Right side: Buy Me a Coffee + Search + Profile Icon
           Row(
             children: [
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 28 : 20,
-                  vertical: isTablet ? 8 : 6,
-                ),
+                width: 150,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF8C32),
+                  color: const Color(0xFFFFEB3B),
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.wb_sunny_rounded,
-                          color: Colors.white,
-                          size: 22 * iconScale.clamp(0.9, 1.3),
-                        ),
-                        SizedBox(width: width * 0.02),
-                        Text(
-                          widget.rewardPoints.toStringAsFixed(2),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16 * fontScale.clamp(0.9, 1.3),
-                          ),
-                        ),
-                      ],
+                    const Icon(
+                      Icons.coffee,
+                      color: Colors.black,
+                      size: 18,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(width: 6),
                     const Text(
-                      "Karma Points",
+                      "Buy Me a Coffee ...",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
                       ),
                     ),
                   ],
+                ),
+              ),
+              SizedBox(width: width * 0.02),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/search'),
+                child: const Icon(
+                  Icons.search_outlined,
+                  color: Colors.black,
+                  size: 36,
                 ),
               ),
               SizedBox(width: width * 0.02),
@@ -163,7 +138,7 @@ class _HomeAppBarState extends State<HomeAppBar> {
   }
 
   Widget _buildProfileAvatar(double iconScale) {
-    final radius = 25 * iconScale.clamp(0.8, 1.3);
+    final radius = 20.0;
     
     // If profile image URL exists (from SharedPreferences)
     if (profileImageUrl != null && profileImageUrl!.isNotEmpty) {
