@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/stores/badge_count_provider.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class BottomNav extends ConsumerWidget {
   final int currentIndex;
@@ -52,14 +53,14 @@ class BottomNav extends ConsumerWidget {
           _navItem(
             context: context,
             ref: ref,
-            icon: Icons.home,
+            icon: HugeIcons.strokeRoundedHome09,
             label: "Home",
             index: 0,
           ),
           _navItem(
             context: context,
             ref: ref,
-            icon: Icons.chat_bubble_outline,
+            icon: HugeIcons.strokeRoundedBubbleChat,
             label: "Chat",
             index: 1,
           ),
@@ -67,14 +68,14 @@ class BottomNav extends ConsumerWidget {
           _navItem(
             context: context,
             ref: ref,
-            icon: Icons.bookmark_outline,
+            icon: HugeIcons.strokeRoundedBookmark02,
             label: "Saved",
             index: 3,
           ),
           _navItem(
             context: context,
             ref: ref,
-            icon: Icons.notifications_outlined,
+            icon: HugeIcons.strokeRoundedNotification02,
             label: "Notification",
             index: 4,
           ),
@@ -86,14 +87,14 @@ class BottomNav extends ConsumerWidget {
   Widget _navItem({
     required BuildContext context,
     required WidgetRef ref,
-    required IconData icon,
+    required dynamic icon,
     required String label,
     required int index,
   }) {
     final bool isActive = index == currentIndex;
     final badgeCounts = ref.watch(badgeCountProvider);
-    final int badgeCount = index == 1 ? badgeCounts.chatCount : (index == 4 ? badgeCounts.notificationCount : 0);
-    final bool showBadge = index == 1 || index == 4;
+    final int badgeCount = index == 4 ? badgeCounts.notificationCount : 0;
+    final bool showBadge = index == 4;
 
     return GestureDetector(
       onTap: () => _handleNavigation(context, index),
@@ -120,10 +121,10 @@ class BottomNav extends ConsumerWidget {
                 color: Colors.grey.shade200,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                size: 24,
+              child: HugeIcon(
+                icon: icon,
                 color: isActive ? Colors.blue : Colors.black,
+                size: 24.0,
               ),
             ),
           ),
@@ -153,10 +154,10 @@ class BottomNav extends ConsumerWidget {
               color: Colors.blue,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.add,
+            child: const HugeIcon(
+              icon: HugeIcons.strokeRoundedAdd01,
               color: Colors.white,
-              size: 28,
+              size: 28.0,
             ),
           ),
           const SizedBox(height: 4),
