@@ -11,6 +11,10 @@ import { initializeSocket } from "./socket/socket.js";
 import { fileURLToPath } from "url";
 import { initializeFirebase } from "./config/firebase.js";
 
+// Resolve __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Ensure temp folder exists
 const tempDir = path.join(process.cwd(), "public/temp");
 if (!fs.existsSync(tempDir)) {
@@ -18,7 +22,8 @@ if (!fs.existsSync(tempDir)) {
   console.log("Created public/temp folder");
 }
 
-const port = process.env.PORT || 8000;
+// Use dynamic port for Fly; fallback to 8000 for local/Render
+const PORT = process.env.PORT || 8000;
 
 // Connect to DB
 connectDB()
@@ -26,19 +31,20 @@ connectDB()
     // Initialize Firebase
     initializeFirebase();
 
-    // HTTP server for Socket.IO
+    // Create HTTP server for Socket.IO
     const httpServer = createServer(app);
 
-    // Init socket
+    // Initialize Socket.IO
     initializeSocket(httpServer);
 
     // Start server
-    httpServer.listen(port, () => {
-      console.log(`Server running on PORT: ${port}`);
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on PORT: ${PORT}`);
       console.log("Socket.io ready");
       console.log("Firebase initialized");
     });
 
+    // Handle app errors
     app.on("error", (error) => {
       console.error("Server ERROR:", error);
       throw error;
@@ -48,11 +54,7 @@ connectDB()
     console.error("Failed MongoDB connection:", err);
   });
 
-// Resolve __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Root test route
+// Serve root HTML file
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "serverWorkingFlag.html"));
 });
