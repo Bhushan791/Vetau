@@ -94,7 +94,7 @@ class BottomNav extends ConsumerWidget {
     final bool isActive = index == currentIndex;
     final badgeCounts = ref.watch(badgeCountProvider);
     final int badgeCount = index == 4 ? badgeCounts.notificationCount : 0;
-    final bool showBadge = index == 4;
+    final bool showBadge = index == 4 && badgeCount > 0;
 
     return GestureDetector(
       onTap: () => _handleNavigation(context, index),

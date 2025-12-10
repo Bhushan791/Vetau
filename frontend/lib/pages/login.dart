@@ -186,7 +186,6 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('userEmail', data['data']['user']['email']);
         await prefs.setString(
             'userProfileImage', data['data']['user']['profileImage'] ?? '');
-        await FCMService.initializeFCM(userId, accessToken);
 
         print('👤 User profile saved');
 

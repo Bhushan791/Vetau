@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/stores/notifications_provider.dart';
+import 'package:frontend/models/notification_model.dart';
 import 'package:frontend/components/bottomNav.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,14 +28,13 @@ class _NotificationPageState extends ConsumerState<NotificationPage> with Single
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index == 0) {
-        ref.read(notificationsProvider.notifier).fetchNotifications();
+        ref.read(notificationsProvider.notifier).refresh();
       } else if (_tabController.index == 1) {
         fetchMyClaims();
       } else if (_tabController.index == 2) {
         fetchClaimsOnMyPosts();
       }
     });
-    ref.read(notificationsProvider.notifier).fetchNotifications();
   }
 
   @override
@@ -44,57 +44,189 @@ class _NotificationPageState extends ConsumerState<NotificationPage> with Single
   }
 
   Widget _buildAllNotifications() {
-    final notificationsState = ref.watch(notificationsProvider);
+    final notificationsAsync = ref.watch(notificationsProvider);
 
-    if (notificationsState.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    return notificationsAsync.when(
+      data: (notifications) {
+        final filtered = notifications.where((n) => n.type != 'message').toList();
+        if (filtered.isEmpty) {
+          return const Center(child: Text('No notifications'));
+        }
+        return RefreshIndicator(
+          onRefresh: () => ref.read(notificationsProvider.notifier).refresh(),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final notification = filtered[index];
+              return _buildNotificationCard(notification);
+            },
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+    );
+  }
+
+  Widget _buildNotificationCard(NotificationModel notification) {
+    final senderImage = notification.data['senderImage'] ?? '';
+    final senderName = notification.data['senderName'] ?? notification.title;
+    final postTitle = notification.data['postTitle'] ?? '';
+    final timeAgo = _getTimeAgo(notification.createdAt);
+    
+    String statusText = '';
+    Color statusColor = Colors.blue;
+    
+    if (notification.type == 'claim') {
+      final status = notification.data['status'] ?? '';
+      if (status == 'accepted') {
+        statusText = 'Accepted';
+        statusColor = Colors.green;
+      } else if (status == 'rejected') {
+        statusText = 'Declined';
+        statusColor = Colors.red;
+      } else {
+        statusText = 'Pending';
+        statusColor = Colors.orange;
+      }
+    } else if (notification.type == 'comment') {
+      statusText = 'Commented';
+      statusColor = Colors.blue;
+    } else if (notification.type == 'status_update') {
+      statusText = 'Update';
+      statusColor = Colors.orange;
     }
 
-    if (notificationsState.notifications.isEmpty) {
-      return const Center(child: Text('No notifications'));
-    }
-
-    return RefreshIndicator(
-      onRefresh: () => ref.read(notificationsProvider.notifier).fetchNotifications(),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: notificationsState.notifications.length,
-        itemBuilder: (context, index) {
-          final notification = notificationsState.notifications[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: notification.isRead ? Colors.white : Colors.blue.shade50,
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundImage: notification.senderImage.isNotEmpty
-                    ? NetworkImage(notification.senderImage)
-                    : null,
-                child: notification.senderImage.isEmpty
-                    ? Text(notification.senderName[0].toUpperCase())
-                    : null,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: notification.isRead ? Colors.white : Colors.blue.shade50,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _handleNotificationTap(notification),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundImage: senderImage.isNotEmpty ? NetworkImage(senderImage) : null,
+                child: senderImage.isEmpty && senderName.isNotEmpty ? Text(senderName[0].toUpperCase()) : const Icon(Icons.person),
               ),
-              title: Text(notification.senderName),
-              subtitle: Text(notification.message, maxLines: 2, overflow: TextOverflow.ellipsis),
-              trailing: !notification.isRead
-                  ? Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
-                    )
-                  : null,
-              onTap: () {
-                if (!notification.isRead) {
-                  ref.read(notificationsProvider.notifier).markAsRead(notification.id);
-                }
-              },
-            ),
-          );
-        },
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            senderName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                        ),
+                        if (statusText.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('• ', style: TextStyle(fontSize: 14, height: 1.4)),
+                        Expanded(
+                          child: Text(
+                            notification.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (postTitle.isNotEmpty) ...[
+                          Flexible(
+                            child: Text(
+                              'Your post: $postTitle',
+                              style: const TextStyle(fontSize: 12, color: Colors.black87),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_getNotificationType(notification.type)} • $timeAgo',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  String _getNotificationType(String type) {
+    switch (type) {
+      case 'claim':
+        return 'Claim';
+      case 'comment':
+        return 'Comment';
+      case 'status_update':
+        return 'Status Update';
+      default:
+        return type;
+    }
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  void _handleNotificationTap(NotificationModel notification) {
+    if (!notification.isRead) {
+      ref.read(notificationsProvider.notifier).markAsRead(notification.notificationId, ref);
+    }
+
+    final postId = notification.data['postId'] ?? '';
+    
+    if (postId.isNotEmpty) {
+      Navigator.pushNamed(context, '/detailHome', arguments: postId);
+    } else if (notification.type == 'claim') {
+      _tabController.animateTo(2);
+    }
   }
 
   Future<void> fetchMyClaims() async {

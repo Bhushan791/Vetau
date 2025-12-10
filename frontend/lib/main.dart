@@ -23,11 +23,12 @@ import 'package:frontend/pages/saved_posts.dart';
 // 🔥 Firebase imports
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:frontend/services/notification_service.dart';
+import 'package:frontend/services/fcm_services.dart';
 
-// GLOBAL NAVIGATOR KEY
+// GLOBAL NAVIGATOR KEY AND PROVIDER CONTAINER
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-final notificationService = NotificationService(navigatorKey);
+late final ProviderContainer providerContainer;
+final fcmService = FcmService();
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -52,11 +53,16 @@ void main() async {
     );
   });
 
-  // 🔥 Initialize notification service
-  notificationService.firebaseInit();
-  await notificationService.setupInteractedMessage();
+  // 🔥 Initialize provider container
+  providerContainer = ProviderContainer();
 
-  runApp(const ProviderScope(child: MyApp()));
+  // 🔥 Initialize FCM service
+  await fcmService.init();
+
+  runApp(UncontrolledProviderScope(
+    container: providerContainer,
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {

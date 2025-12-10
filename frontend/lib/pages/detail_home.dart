@@ -10,6 +10,7 @@ import 'package:frontend/config/api_constants.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 class DetailHome extends ConsumerStatefulWidget {
   final String postId;
@@ -242,14 +243,20 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
           ),
           const SizedBox(height: 16),
           
-          ElevatedButton.icon(
-            onPressed: _showClaimDialog,
-            icon: const Icon(Icons.chat_outlined, color: Colors.white),
-            label: const Text("Claim as found", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 180,
+              child: ElevatedButton.icon(
+                onPressed: _showClaimDialog,
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedBubbleChat, color: Colors.white, size: 18.0),
+                label: const Text("Claim as found", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),

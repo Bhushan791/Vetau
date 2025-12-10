@@ -1,38 +1,60 @@
+// lib/models/notification_model.dart
 class NotificationModel {
-  final String id;
-  final String senderId;
-  final String senderName;
-  final String senderImage;
-  final String type;
-  final String message;
-  final String relatedId;
+  final String notificationId;
+  final String userId;
+  final String type; // claim | message | comment | status_update | ...
+  final String title;
+  final String body;
+  final Map<String, dynamic> data;
   final bool isRead;
+  final bool isSent;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   NotificationModel({
-    required this.id,
-    required this.senderId,
-    required this.senderName,
-    required this.senderImage,
+    required this.notificationId,
+    required this.userId,
     required this.type,
-    required this.message,
-    required this.relatedId,
+    required this.title,
+    required this.body,
+    required this.data,
     required this.isRead,
+    required this.isSent,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
-    final sender = json['senderId'] ?? {};
+    DateTime parseDate(dynamic v) {
+      if (v == null) return DateTime.now();
+      if (v is DateTime) return v;
+      return DateTime.tryParse(v.toString()) ?? DateTime.now();
+    }
+
     return NotificationModel(
-      id: json['_id'] ?? '',
-      senderId: sender['_id'] ?? '',
-      senderName: sender['fullName'] ?? 'Unknown',
-      senderImage: sender['profileImage'] ?? '',
+      notificationId: json['notificationId'] ?? json['_id'] ?? '',
+      userId: json['userId']?.toString() ?? json['user']?.toString() ?? '',
       type: json['type'] ?? '',
-      message: json['message'] ?? '',
-      relatedId: json['relatedId'] ?? '',
+      title: json['title'] ?? '',
+      body: json['body'] ?? '',
+      data: (json['data'] is Map) ? Map<String, dynamic>.from(json['data']) : {},
       isRead: json['isRead'] ?? false,
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      isSent: json['isSent'] ?? false,
+      createdAt: parseDate(json['createdAt'] ?? json['created_at'] ?? json['createdAt']),
+      updatedAt: parseDate(json['updatedAt'] ?? json['updated_at'] ?? json['updatedAt']),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'notificationId': notificationId,
+        'userId': userId,
+        'type': type,
+        'title': title,
+        'body': body,
+        'data': data,
+        'isRead': isRead,
+        'isSent': isSent,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 }
