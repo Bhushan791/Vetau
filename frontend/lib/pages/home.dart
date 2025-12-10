@@ -8,6 +8,7 @@ import 'package:frontend/components/post_card.dart';
 import 'package:frontend/stores/filter_store.dart';
 import 'package:frontend/stores/posts_provider.dart';
 import 'package:frontend/services/socket_service.dart';
+import 'package:shimmer/shimmer.dart';
 
 // =====================================================================
 //                                HOME PAGE
@@ -23,6 +24,7 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolling = false;
+  bool _isInitialLoading = true;
   Key _appBarKey = UniqueKey();
 
   @override
@@ -67,10 +69,116 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  Widget _buildShimmerCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade400, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      height: 24,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    Container(
+                      height: 24,
+                      width: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 18,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 14,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  height: 14,
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      height: 13,
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 13,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final postsState = ref.watch(postsProvider);
     final filters = ref.watch(filterStoreProvider);
+
+    ref.listen(postsProvider, (previous, next) {
+      if (mounted && !next.isLoading) {
+        setState(() => _isInitialLoading = false);
+      }
+    });
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -111,9 +219,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
             ),
-            if (postsState.isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+            if (_isInitialLoading)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => Shimmer.fromColors(
+                      baseColor: Colors.grey.shade300,
+                      highlightColor: Colors.grey.shade100,
+                      period: const Duration(milliseconds: 1000),
+                      child: _buildShimmerCard(),
+                    ),
+                    childCount: 3,
+                  ),
+                ),
               )
             else if (postsState.error != null)
               SliverFillRemaining(
