@@ -12,7 +12,6 @@ import 'package:frontend/pages/home.dart';
 import 'package:frontend/pages/search.dart';
 import 'package:frontend/pages/search_results.dart';
 import 'package:frontend/pages/chat/all_chats.dart';
-import 'package:frontend/pages/more.dart';
 import 'package:frontend/pages/post.dart';
 import 'package:frontend/pages/detail_home.dart';
 import 'package:frontend/pages/profile.dart';
@@ -84,7 +83,6 @@ class MyApp extends StatelessWidget {
         '/search': (context) => const SearchPage(),
         '/chats': (context) => const ChatsPage(),
         '/saved': (context) => const SavedPosts(),
-        '/more': (context) => const MorePage(),
         '/post': (context) => const PostPage(),
         '/profile': (context) => const ProfilePage(),
         '/forgotPassword': (context) => const ForgotPassword(),

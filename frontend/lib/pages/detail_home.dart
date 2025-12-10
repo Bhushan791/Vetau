@@ -49,7 +49,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     });
 
     final url =
-        "https://vetau.onrender.com/api/v1/posts/${widget.postId}";
+        "${ApiConstants.baseUrl}/posts/${widget.postId}";
 
     try {
       final response = await http.get(Uri.parse(url));
@@ -77,7 +77,7 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     final token = prefs.getString('accessToken');
 
     final response = await http.delete(
-      Uri.parse("https://vetau.onrender.com/api/v1/posts/${widget.postId}"),
+      Uri.parse("${ApiConstants.baseUrl}/posts/${widget.postId}"),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',

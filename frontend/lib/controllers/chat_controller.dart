@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/models/message_model.dart';
 import 'package:frontend/services/api_client.dart';
 import 'package:frontend/services/socket_service.dart';
@@ -21,7 +22,7 @@ class ChatController {
   ChatController(this.ref, this.roomId);
 
   ApiClient get _client => ApiClient(
-        baseUrl: "https://vetau.onrender.com/api/v1",
+        baseUrl: ApiConstants.baseUrl,
         onSessionExpired: (context) {
           // handle logout
         },
@@ -34,7 +35,7 @@ class ChatController {
     final currentUserId = await _getCurrentUserId();
     
     final response = await _client.get(
-      Uri.parse("https://vetau.onrender.com/api/v1/chats/$roomId/messages"),
+      Uri.parse("${ApiConstants.baseUrl}/chats/$roomId/messages"),
     );
 
     final jsonBody = jsonDecode(response.body);
@@ -54,7 +55,7 @@ class ChatController {
     
     final response = await _client.get(
       Uri.parse(
-          "https://vetau.onrender.com/api/v1/chats/$roomId/messages?page=$page"),
+          "${ApiConstants.baseUrl}/chats/$roomId/messages?page=$page"),
     );
 
     final jsonBody = jsonDecode(response.body);

@@ -7,6 +7,7 @@ import 'package:frontend/components/bottomNav.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:frontend/config/api_constants.dart';
 
 // NEW imports required for conversion
 import 'package:image/image.dart' as img;
@@ -287,7 +288,7 @@ class _PostPageState extends State<PostPage> {
     print("Full payload (for future backend): $futurePayload");
     // -------------------------------------------------------
 
-    final uri = Uri.parse("https://vetau.onrender.com/api/v1/posts");
+    final uri = Uri.parse("${ApiConstants.baseUrl}/posts");
 
     final request = http.MultipartRequest("POST", uri);
 
