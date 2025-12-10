@@ -2,18 +2,18 @@ app = "vetaunp"
 primary_region = "bom"
 
 [build]
-  builder = "paketobuildpacks/builder:base"  # Auto-detect Node.js
+  builder = "paketobuildpacks/builder:base"  # Node.js buildpack
 
 [http_service]
 auto_start_machines = true
 auto_stop_machines = true
 force_https = true
 internal_port = 8080
-min_machines_running = 1   # Single machine for Free Tier
+min_machines_running = 1
 processes = ["app"]
 
 [[vm]]
 cpu_kind = "shared"
-cpus = 1       # Free Tier limit
+cpus = 1
 memory = "1gb"
 memory_mb = 1024
