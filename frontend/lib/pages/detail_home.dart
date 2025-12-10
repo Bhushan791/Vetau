@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/pages/editPost.dart';
+import 'package:frontend/pages/edit_post_page.dart';
 import 'package:frontend/stores/like_store.dart';
 import 'package:frontend/stores/saved_posts_provider.dart';
 import 'package:frontend/components/post_header.dart';
@@ -98,7 +98,11 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
     ref.watch(likesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Post Details")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Post Details"),
+        backgroundColor: Colors.white,
+      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : hasError
@@ -168,7 +172,18 @@ class _DetailHomeState extends ConsumerState<DetailHome> {
                     const PopupMenuItem(value: "delete", child: Text("Delete")),
                   ],
                   onSelected: (value) {
-                    if (value == "edit") Navigator.push(context, MaterialPageRoute(builder: (_) => Editpost()));
+                    if (value == "edit") {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditPostPage(postId: widget.postId),
+                        ),
+                      ).then((updated) {
+                        if (updated == true) {
+                          fetchPost();
+                        }
+                      });
+                    }
                     if (value == "delete") deletePost();
                   },
                 ),

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:frontend/config/api_constants.dart';
 import 'package:frontend/pages/detail_home.dart';
-import 'package:frontend/pages/home.dart';
 import 'package:frontend/components/searchAppBar.dart';
+import 'package:frontend/components/post_card.dart';
 import 'package:http/http.dart' as http;
 
 class SearchResults extends StatefulWidget {

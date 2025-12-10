@@ -33,8 +33,8 @@ class PostTypeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isSelected = selectedType == type;
     final Color buttonColor = isSelected
-        ? (type == PostType.lost ? Colors.red.shade700 : Colors.blue.shade700)
-        : (type == PostType.lost ? Colors.red.shade100 : Colors.blue.shade100);
+        ? (type == PostType.lost ? const Color(0xFFFF4747) : const Color(0xFF2563EB))
+        : (type == PostType.lost ? const Color(0xFFFFE5E5) : const Color(0xFFE0EAFF));
     final Color textColor = isSelected ? Colors.white : Colors.black;
 
     return ElevatedButton(
@@ -154,15 +154,15 @@ class _PostPageState extends State<PostPage> {
         prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.grey.shade600, size: 20) : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: Colors.grey.shade400),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: Colors.grey.shade400),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF5182EF), width: 1.5),
         ),
       ),
     );
@@ -401,7 +401,15 @@ class _PostPageState extends State<PostPage> {
             backgroundColor: Colors.white,
             appBar: AppBar(
               backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
               elevation: 0,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(
+                  color: Colors.grey.shade300,
+                  height: 1,
+                ),
+              ),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.black),
                 onPressed: () => Navigator.pop(context),
@@ -413,7 +421,7 @@ class _PostPageState extends State<PostPage> {
                   padding: const EdgeInsets.only(right: 16),
                   child: TextButton(
                     onPressed: _submitPost,
-                    child: const Text('Post', style: TextStyle(color: Color(0xFF6366F1), fontSize: 16, fontWeight: FontWeight.w600)),
+                    child: const Text('Post', style: TextStyle(color: Color(0xFF5182EF), fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -529,8 +537,8 @@ class _PostPageState extends State<PostPage> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      side: const BorderSide(color: Color(0xFF6366F1)),
-                      foregroundColor: const Color(0xFF6366F1),
+                      side: const BorderSide(color: Color(0xFF5182EF)),
+                      foregroundColor: const Color(0xFF5182EF),
                       backgroundColor: Colors.white,
                     ),
                   ),
@@ -563,7 +571,7 @@ class _PostPageState extends State<PostPage> {
                     Switch(
                       value: _isAnonymous,
                       onChanged: (value) => setState(() => _isAnonymous = value),
-                      activeColor: const Color(0xFF6366F1),
+                      activeColor: const Color(0xFF5182EF),
                     ),
                   ],
                 ),
@@ -577,7 +585,7 @@ class _PostPageState extends State<PostPage> {
             Container(
               color: Colors.black54,
               child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+                child: CircularProgressIndicator(color: Color(0xFF5182EF)),
               ),
             ),
         ],
