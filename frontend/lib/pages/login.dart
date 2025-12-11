@@ -4,6 +4,7 @@ import 'package:frontend/services/cookie_storage.dart';
 import 'package:frontend/services/fcm_services.dart';
 import 'package:frontend/services/token_service.dart';
 import 'package:frontend/services/socket_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -128,6 +129,27 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  Future<void> _sendFcmTokenToBackend(String fcmToken, String accessToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/users/fcm-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({'fcmToken': fcmToken}),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ FCM token sent to backend successfully');
+      } else {
+        print('❌ Failed to send FCM token: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error sending FCM token: $e');
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -196,7 +218,25 @@ class _LoginPageState extends State<LoginPage> {
         await SocketService.instance.waitForConnection();
         print('🔧 Socket initialized with new token');
 
+        // Get and send FCM token to backend
+        try {
+          final fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            print('📱 FCM Token: $fcmToken');
+            await _sendFcmTokenToBackend(fcmToken, accessToken);
+          }
+        } catch (e) {
+          print('⚠️ Failed to get/send FCM token: $e');
+        }
+
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login Successful!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
           Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
         }
 
@@ -227,6 +267,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       body: SafeArea(
         child: SingleChildScrollView(
           padding:

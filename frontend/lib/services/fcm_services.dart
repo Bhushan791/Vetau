@@ -16,6 +16,38 @@ class FcmService {
   FcmService();
 
   Future<void> init() async {
+    // Request notification permissions
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Create Android notification channels
+    const messagesChannel = AndroidNotificationChannel(
+      'messages_channel',
+      'Messages',
+      description: 'Message notifications',
+      importance: Importance.max,
+      playSound: true,
+    );
+
+    const generalChannel = AndroidNotificationChannel(
+      'general_channel',
+      'General',
+      description: 'General notifications',
+      importance: Importance.defaultImportance,
+      playSound: true,
+    );
+
+    await _local
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(messagesChannel);
+    
+    await _local
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(generalChannel);
+
     // local notifications init
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
@@ -71,9 +103,19 @@ class FcmService {
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
+      enableVibration: true,
     );
 
-    final notificationDetails = NotificationDetails(android: androidDetails);
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     // Use chatId in payload so tapping local notification opens the chat
     await _local.show(
@@ -83,6 +125,8 @@ class FcmService {
       notificationDetails,
       payload: jsonEncode({'type': 'message', 'chatId': chatId}),
     );
+    
+    if (kDebugMode) print('📱 Local notification shown for message');
   }
 
   Future<void> _showLocalNotificationForGeneric(RemoteMessage message) async {
@@ -92,9 +136,20 @@ class FcmService {
       channelDescription: 'General notifications',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
+      playSound: true,
+      enableVibration: true,
     );
 
-    final notificationDetails = NotificationDetails(android: androidDetails);
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _local.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -107,6 +162,8 @@ class FcmService {
         'notificationId': message.data['notificationId'] ?? '',
       }),
     );
+    
+    if (kDebugMode) print('📱 Local notification shown for generic');
   }
 
   void _handleMessageRouting(RemoteMessage message) {

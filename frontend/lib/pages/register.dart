@@ -187,7 +187,7 @@ class _RegisterPageState extends State<RegisterPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("✅ Registration Successful!"),
+              content: Text("Account created login successful!"),
               backgroundColor: Colors.green,
             ),
           );
